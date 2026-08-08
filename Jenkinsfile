@@ -1,4 +1,5 @@
 pipeline {
+
     agent any
 
     stages {
@@ -42,14 +43,25 @@ pipeline {
 
         stage('Health Check') {
             steps {
-                bat 'curl --fail http://localhost:8081/'
+                echo 'Checking application health...'
+
+                retry(5) {
+                    sleep time: 5, unit: 'SECONDS'
+                    bat 'curl --fail http://localhost:8081/'
+                }
+
+                echo 'Application is running successfully!'
             }
         }
     }
 
     post {
+
         success {
+            echo '======================================'
             echo 'CI/CD PIPELINE COMPLETED SUCCESSFULLY!'
+            echo 'Application: http://localhost:8081/'
+            echo '======================================'
         }
 
         failure {
