@@ -2,55 +2,133 @@ pipeline {
 
     agent any
 
+    tools {
+        jdk 'JDK17'
+        maven 'Maven3'
+    }
+
+    environment {
+        APP_IMAGE = 'tasknexus-ci'
+        TEST_CONTAINER = 'tasknexus-jenkins-test'
+        TEST_PORT = '8090'
+        TEST_URL = 'http://localhost:8090'
+    }
+
     stages {
 
-        stage('Checkout') {
+        stage('Environment Check') {
             steps {
+                echo 'Checking required tools...'
+
+                bat 'java -version'
+                bat 'mvn -version'
+                bat 'git --version'
+                bat 'docker version'
+            }
+        }
+
+        stage('Checkout GitHub') {
+            steps {
+                echo 'Checking out TaskNexus source code...'
+
                 checkout scm
             }
         }
 
         stage('Maven Build') {
             steps {
-                bat 'mvn clean compile'
-            }
-        }
+                echo 'Building WAR using Maven...'
 
-        stage('Test') {
-            steps {
-                bat 'mvn test'
-            }
-        }
-
-        stage('Package WAR') {
-            steps {
-                bat 'mvn package -DskipTests'
+                bat 'mvn clean package -DskipTests'
             }
         }
 
         stage('Docker Build') {
             steps {
-                bat 'docker build -t javawebapp:1.0 .'
+                echo 'Building TaskNexus Docker image...'
+
+                bat '''
+                    docker build --no-cache ^
+                    -t %APP_IMAGE%:%BUILD_NUMBER% .
+                '''
             }
         }
 
-        stage('Deploy') {
+        stage('Remove Old Test Container') {
             steps {
-                bat 'docker rm -f javawebapp || exit 0'
-                bat 'docker run -d --name javawebapp -p 8081:8080 javawebapp:1.0'
+                powershell '''
+                    docker rm -f $env:TEST_CONTAINER 2>$null
+                    exit 0
+                '''
             }
         }
 
-        stage('Health Check') {
+        stage('Deploy Test Container') {
             steps {
-                echo 'Checking application health...'
+                echo 'Starting temporary Tomcat container...'
 
-                retry(5) {
-                    sleep time: 5, unit: 'SECONDS'
-                    bat 'curl --fail http://localhost:8081/'
-                }
+                bat '''
+                    docker run -d ^
+                    --name %TEST_CONTAINER% ^
+                    -p %TEST_PORT%:8080 ^
+                    %APP_IMAGE%:%BUILD_NUMBER%
+                '''
+            }
+        }
 
-                echo 'Application is running successfully!'
+        stage('Wait For Application') {
+            steps {
+                echo 'Waiting for TaskNexus to become available...'
+
+                powershell '''
+                    $ready = $false
+
+                    for ($i = 1; $i -le 30; $i++) {
+
+                        try {
+
+                            $response = Invoke-WebRequest `
+                                -UseBasicParsing `
+                                -Uri "$env:TEST_URL/tasks" `
+                                -TimeoutSec 2
+
+                            if ($response.StatusCode -eq 200) {
+                                $ready = $true
+                                break
+                            }
+
+                        } catch {
+                        }
+
+                        Start-Sleep -Seconds 2
+                    }
+
+                    if (-not $ready) {
+
+                        docker logs $env:TEST_CONTAINER
+
+                        exit 1
+                    }
+                '''
+            }
+        }
+
+        stage('Selenium Tests') {
+            steps {
+                echo 'Running 10 Selenium test cases...'
+
+                bat '''
+                    mvn test ^
+                    -Dheadless=true ^
+                    -DbaseUrl=%TEST_URL%
+                '''
+            }
+        }
+
+        stage('Publish Test Results') {
+            steps {
+                junit testResults: 'target/surefire-reports/*.xml',
+                      allowEmptyResults: false
             }
         }
     }
@@ -58,14 +136,25 @@ pipeline {
     post {
 
         success {
-            echo '======================================'
-            echo 'CI/CD PIPELINE COMPLETED SUCCESSFULLY!'
-            echo 'Application: http://localhost:8081/'
-            echo '======================================'
+            echo '==================================='
+            echo 'TASKNEXUS PIPELINE SUCCESSFUL'
+            echo '==================================='
         }
 
         failure {
-            echo 'CI/CD PIPELINE FAILED!'
+            echo 'TASKNEXUS PIPELINE FAILED'
         }
+
+        always {
+
+            archiveArtifacts artifacts: 'target/selenium-screenshots/*.png',
+                             allowEmptyArchive: true
+
+            powershell '''
+                docker rm -f $env:TEST_CONTAINER 2>$null
+                exit 0
+            '''
+        }
+ 
     }
 }
