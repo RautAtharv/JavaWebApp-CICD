@@ -9,746 +9,319 @@ pipeline {
 
     environment {
 
-        DOCKER_EXE =
-            'C:\\Users\\DELL\\AppData\\Local\\Programs\\DockerDesktop\\resources\\bin\\docker.exe'
-
-        APP_NAME = 'TaskNexus'
+        DOCKER_EXE = 'C:\\Users\\DELL\\AppData\\Local\\Programs\\DockerDesktop\\resources\\bin\\docker.exe'
 
         APP_IMAGE = 'tasknexus-ci'
 
-        TEST_CONTAINER = 'tasknexus-jenkins-test'
+        CONTAINER_NAME = 'tasknexus-jenkins-test'
 
-        TEST_PORT = '8090'
+        APP_PORT = '8090'
 
-        TEST_URL = 'http://localhost:8090'
-
-        WAR_FILE = 'target\\JavaWebApp.war'
+        APP_URL = 'http://localhost:8090'
     }
-
 
     stages {
 
-
-        stage('Project Information') {
-
+        stage('Checkout') {
             steps {
-
-                echo '=================================================='
-                echo '              TASKNEXUS PRO CI/CD'
-                echo '=================================================='
-
-                echo 'Application : TaskNexus Pro'
-                echo 'Technology  : Java 17 / Servlet / JSP'
-                echo 'Build Tool  : Maven'
-                echo 'Server      : Apache Tomcat'
-                echo 'Container   : Docker'
-                echo 'Testing     : Selenium WebDriver'
-                echo 'CI Tool     : Jenkins'
-                echo 'Source      : GitHub'
-
-                echo '=================================================='
-            }
-        }
-
-
-        stage('Checkout GitHub') {
-
-            steps {
-
-                echo '=================================================='
-                echo '              GITHUB CHECKOUT'
-                echo '=================================================='
+                echo 'Checking out TaskNexus source code...'
 
                 git(
                     branch: 'main',
                     url: 'https://github.com/RautAtharv/JavaWebApp-CICD.git'
                 )
-
-                echo 'GitHub repository checked out successfully.'
             }
         }
-
-
-        stage('Verify Project Files') {
-
-            steps {
-
-                echo '=================================================='
-                echo '             VERIFY PROJECT FILES'
-                echo '=================================================='
-
-                bat 'dir'
-
-                echo 'Checking pom.xml...'
-
-                bat '''
-                    if not exist "pom.xml" (
-                        echo ERROR: pom.xml not found.
-                        exit /b 1
-                    )
-
-                    echo pom.xml found.
-                '''
-
-
-                echo 'Checking Dockerfile...'
-
-                bat '''
-                    if not exist "Dockerfile" (
-                        echo ERROR: Dockerfile not found.
-                        exit /b 1
-                    )
-
-                    echo Dockerfile found.
-                '''
-
-
-                echo 'Checking source directory...'
-
-                bat '''
-                    if not exist "src" (
-                        echo ERROR: src directory not found.
-                        exit /b 1
-                    )
-
-                    echo src directory found.
-                '''
-            }
-        }
-
 
         stage('Environment Check') {
-
             steps {
-
-                echo '=================================================='
-                echo '             ENVIRONMENT CHECK'
-                echo '=================================================='
-
-
                 echo 'Checking Java...'
-
                 bat 'java -version'
 
-
                 echo 'Checking Maven...'
-
                 bat 'mvn -version'
 
-
                 echo 'Checking Git...'
-
                 bat 'git --version'
 
-
                 echo 'Checking Docker...'
-
                 bat '"%DOCKER_EXE%" version'
 
-
                 echo 'Checking Docker containers...'
-
                 bat '"%DOCKER_EXE%" ps'
-
-
-                echo 'Environment verification completed.'
             }
         }
-
 
         stage('Maven Clean') {
-
             steps {
-
-                echo '=================================================='
-                echo '                 MAVEN CLEAN'
-                echo '=================================================='
+                echo 'Running Maven clean...'
 
                 bat 'mvn clean'
-
-                echo 'Maven clean completed successfully.'
             }
         }
-
 
         stage('Maven Compile') {
-
             steps {
-
-                echo '=================================================='
-                echo '                MAVEN COMPILE'
-                echo '=================================================='
+                echo 'Compiling TaskNexus...'
 
                 bat 'mvn compile'
-
-                echo 'Compilation completed successfully.'
             }
         }
 
-
-        stage('Maven Unit Test') {
-
+        stage('Maven Unit Tests') {
             steps {
+                echo 'Running Maven unit tests...'
 
-                echo '=================================================='
-                echo '               MAVEN UNIT TEST'
-                echo '=================================================='
-
-                bat 'mvn test -DskipTests=false'
-
-                echo 'Maven test stage completed.'
+                bat 'mvn test'
             }
         }
-
 
         stage('Build WAR') {
-
             steps {
-
-                echo '=================================================='
-                echo '                 WAR PACKAGING'
-                echo '=================================================='
+                echo 'Creating TaskNexus WAR file...'
 
                 bat 'mvn package -DskipTests'
 
-                echo 'Maven packaging completed.'
+                echo 'Contents of target directory:'
 
                 bat 'dir target'
             }
         }
 
-
-        stage('Verify WAR File') {
-
+        stage('Verify WAR') {
             steps {
-
-                echo '=================================================='
-                echo '                 VERIFY WAR'
-                echo '=================================================='
-
                 bat '''
                     if not exist "target\\JavaWebApp.war" (
-                        echo.
-                        echo ==============================================
-                        echo ERROR: JavaWebApp.war NOT FOUND
-                        echo ==============================================
-                        echo.
+                        echo ERROR: target\\JavaWebApp.war was not created.
+                        echo Available files:
                         dir target
                         exit /b 1
                     )
 
-                    echo.
-                    echo ==============================================
-                    echo SUCCESS: JavaWebApp.war FOUND
-                    echo ==============================================
-                    echo.
+                    echo SUCCESS: JavaWebApp.war found.
                 '''
             }
         }
 
-
-        stage('Docker Information') {
-
-            steps {
-
-                echo '=================================================='
-                echo '               DOCKER INFORMATION'
-                echo '=================================================='
-
-                bat '"%DOCKER_EXE%" version'
-
-                bat '"%DOCKER_EXE%" info'
-            }
-        }
-
-
         stage('Docker Build') {
-
             steps {
-
-                echo '=================================================='
-                echo '                DOCKER BUILD'
-                echo '=================================================='
+                echo 'Building TaskNexus Docker image...'
 
                 bat '''
                     "%DOCKER_EXE%" build ^
                     --no-cache ^
                     -t %APP_IMAGE%:%BUILD_NUMBER% .
                 '''
-
-                echo 'Docker image built successfully.'
             }
         }
 
-
-        stage('Docker Image Verification') {
-
+        stage('Docker Image Check') {
             steps {
-
-                echo '=================================================='
-                echo '            DOCKER IMAGE VERIFICATION'
-                echo '=================================================='
+                echo 'Verifying Docker image...'
 
                 bat '"%DOCKER_EXE%" images'
 
                 bat '''
-                    "%DOCKER_EXE%" image inspect ^
-                    %APP_IMAGE%:%BUILD_NUMBER%
+                    "%DOCKER_EXE%" image inspect %APP_IMAGE%:%BUILD_NUMBER%
                 '''
-
-                echo 'Docker image verification completed.'
             }
         }
 
-
-        stage('Remove Existing Test Container') {
-
+        stage('Remove Old Container') {
             steps {
-
-                echo '=================================================='
-                echo '           REMOVE OLD TEST CONTAINER'
-                echo '=================================================='
+                echo 'Removing previous Jenkins test container...'
 
                 bat '''
-                    "%DOCKER_EXE%" rm -f ^
-                    %TEST_CONTAINER% 2>NUL
-
+                    "%DOCKER_EXE%" rm -f %CONTAINER_NAME% 2>NUL
                     exit /b 0
                 '''
-
-                echo 'Old test container removed if it existed.'
             }
         }
 
-
-        stage('Deploy TaskNexus Container') {
-
+        stage('Deploy TaskNexus') {
             steps {
-
-                echo '=================================================='
-                echo '             DEPLOY TASKNEXUS'
-                echo '=================================================='
+                echo 'Starting TaskNexus Tomcat container...'
 
                 bat '''
                     "%DOCKER_EXE%" run -d ^
-                    --name %TEST_CONTAINER% ^
-                    -p %TEST_PORT%:8080 ^
+                    --name %CONTAINER_NAME% ^
+                    -p %APP_PORT%:8080 ^
                     %APP_IMAGE%:%BUILD_NUMBER%
                 '''
-
-                echo 'TaskNexus container started.'
             }
         }
 
-
-        stage('Container Status') {
-
+        stage('Container Check') {
             steps {
-
-                echo '=================================================='
-                echo '             CONTAINER STATUS'
-                echo '=================================================='
+                echo 'Checking running TaskNexus container...'
 
                 bat '"%DOCKER_EXE%" ps'
 
                 bat '"%DOCKER_EXE%" ps -a'
-
-                echo 'Container status verified.'
             }
         }
 
-
-        stage('Container Details') {
-
+        stage('Wait For Application') {
             steps {
-
-                echo '=================================================='
-                echo '            CONTAINER DETAILS'
-                echo '=================================================='
-
-                bat '''
-                    "%DOCKER_EXE%" inspect ^
-                    %TEST_CONTAINER%
-                '''
-            }
-        }
-
-
-        stage('Wait For Tomcat') {
-
-            steps {
-
-                echo '=================================================='
-                echo '             WAIT FOR TOMCAT'
-                echo '=================================================='
+                echo 'Waiting for TaskNexus to start...'
 
                 powershell '''
-
+                    $url = $env:APP_URL
                     $ready = $false
-
-                    Write-Host "Waiting for TaskNexus..."
 
                     for ($i = 1; $i -le 30; $i++) {
 
-                        Write-Host "Application check $i / 30"
+                        Write-Host "Checking TaskNexus - attempt $i of 30"
 
                         try {
-
                             $response = Invoke-WebRequest `
+                                -Uri "$url/tasks" `
                                 -UseBasicParsing `
-                                -Uri "$env:TEST_URL/tasks" `
                                 -TimeoutSec 3
 
-                            Write-Host "HTTP Status: $($response.StatusCode)"
-
                             if ($response.StatusCode -eq 200) {
-
-                                Write-Host "TaskNexus is ready."
-
+                                Write-Host "TaskNexus is running."
                                 $ready = $true
-
                                 break
                             }
-
                         }
                         catch {
-
-                            Write-Host "TaskNexus is still starting..."
+                            Write-Host "Application is still starting..."
                         }
 
                         Start-Sleep -Seconds 2
                     }
 
-
                     if (-not $ready) {
-
-                        Write-Host "===================================="
-                        Write-Host "TASKNEXUS STARTUP FAILED"
-                        Write-Host "===================================="
-
-                        & "$env:DOCKER_EXE" logs $env:TEST_CONTAINER
-
+                        Write-Host "TaskNexus did not start successfully."
                         exit 1
                     }
-
-                    Write-Host "TaskNexus startup successful."
                 '''
             }
         }
-
 
         stage('Application Health Check') {
-
             steps {
-
-                echo '=================================================='
-                echo '          APPLICATION HEALTH CHECK'
-                echo '=================================================='
+                echo 'Checking TaskNexus web application...'
 
                 powershell '''
-
                     try {
 
                         $response = Invoke-WebRequest `
+                            -Uri "$env:APP_URL/tasks" `
                             -UseBasicParsing `
-                            -Uri "$env:TEST_URL/tasks" `
                             -TimeoutSec 10
 
-                        Write-Host "Application HTTP Status:"
-                        Write-Host $response.StatusCode
-
+                        Write-Host "HTTP Status Code: $($response.StatusCode)"
 
                         if ($response.StatusCode -ne 200) {
-
-                            Write-Host "Application health check failed."
-
                             exit 1
                         }
 
-
-                        Write-Host "Application health check successful."
+                        Write-Host "Application health check passed."
                     }
-
                     catch {
 
-                        Write-Host "Unable to access TaskNexus."
-
-                        & "$env:DOCKER_EXE" logs $env:TEST_CONTAINER
-
+                        Write-Host "Application health check failed."
                         exit 1
                     }
                 '''
             }
         }
-
-
-        stage('Application Content Check') {
-
-            steps {
-
-                echo '=================================================='
-                echo '          APPLICATION CONTENT CHECK'
-                echo '=================================================='
-
-                powershell '''
-
-                    try {
-
-                        $response = Invoke-WebRequest `
-                            -UseBasicParsing `
-                            -Uri "$env:TEST_URL/tasks" `
-                            -TimeoutSec 10
-
-                        $content = $response.Content
-
-
-                        if ([string]::IsNullOrWhiteSpace($content)) {
-
-                            Write-Host "Application returned empty content."
-
-                            exit 1
-                        }
-
-
-                        Write-Host "Application returned valid content."
-
-                        Write-Host "Response length:"
-                        Write-Host $content.Length
-                    }
-
-                    catch {
-
-                        Write-Host "Content verification failed."
-
-                        exit 1
-                    }
-                '''
-            }
-        }
-
-
-        stage('Selenium Test Preparation') {
-
-            steps {
-
-                echo '=================================================='
-                echo '          SELENIUM TEST PREPARATION'
-                echo '=================================================='
-
-                echo 'Selenium target URL:'
-                echo '%TEST_URL%'
-
-                bat 'dir src\\test'
-
-                echo 'Selenium test preparation completed.'
-            }
-        }
-
 
         stage('Selenium Tests') {
-
             steps {
-
-                echo '=================================================='
-                echo '             SELENIUM TESTS'
-                echo '=================================================='
-
-                echo 'Running 10 Selenium automated test cases.'
+                echo 'Running 10 Selenium test cases...'
 
                 bat '''
                     mvn test ^
                     -Dheadless=true ^
-                    -DbaseUrl=%TEST_URL%
-                '''
-
-                echo 'Selenium test execution completed.'
-            }
-        }
-
-
-        stage('Test Result Verification') {
-
-            steps {
-
-                echo '=================================================='
-                echo '          TEST RESULT VERIFICATION'
-                echo '=================================================='
-
-                bat '''
-                    if not exist "target\\surefire-reports" (
-                        echo ERROR: Surefire reports not found.
-                        exit /b 1
-                    )
-
-                    echo Surefire reports found.
-
-                    dir target\\surefire-reports
+                    -DbaseUrl=%APP_URL%
                 '''
             }
         }
 
-
-        stage('Publish JUnit Results') {
-
+        stage('Publish Test Results') {
             steps {
-
-                echo '=================================================='
-                echo '            PUBLISH JUNIT RESULTS'
-                echo '=================================================='
+                echo 'Publishing JUnit/Selenium test results...'
 
                 junit(
                     testResults: 'target/surefire-reports/*.xml',
                     allowEmptyResults: false
                 )
-
-                echo 'JUnit results published.'
             }
         }
 
-
-        stage('Archive Selenium Screenshots') {
-
+        stage('Archive Screenshots') {
             steps {
-
-                echo '=================================================='
-                echo '        ARCHIVE SELENIUM SCREENSHOTS'
-                echo '=================================================='
+                echo 'Archiving Selenium screenshots...'
 
                 archiveArtifacts(
                     artifacts: 'target/selenium-screenshots/*.png',
                     allowEmptyArchive: true
                 )
-
-                echo 'Screenshot archive step completed.'
             }
         }
 
-
-        stage('Final Container Check') {
-
+        stage('Final Verification') {
             steps {
-
-                echo '=================================================='
-                echo '          FINAL CONTAINER CHECK'
-                echo '=================================================='
+                echo 'Final Docker verification...'
 
                 bat '"%DOCKER_EXE%" ps -a'
 
-                echo 'Final container check completed.'
-            }
-        }
-
-
-        stage('Final Image Check') {
-
-            steps {
-
-                echo '=================================================='
-                echo '             FINAL IMAGE CHECK'
-                echo '=================================================='
-
                 bat '"%DOCKER_EXE%" images'
 
-                echo 'Final Docker image check completed.'
+                echo 'TaskNexus CI pipeline verification completed.'
             }
         }
     }
-
 
     post {
 
-
         success {
+            echo '''
+==================================================
+        TASKNEXUS PIPELINE SUCCESSFUL
+==================================================
 
-            echo ''
-            echo '=================================================='
-            echo '          TASKNEXUS PIPELINE SUCCESS'
-            echo '=================================================='
+GitHub Checkout       : SUCCESS
+Java 17               : SUCCESS
+Maven                 : SUCCESS
+Compilation           : SUCCESS
+Unit Tests            : SUCCESS
+WAR Packaging         : SUCCESS
+Docker Build          : SUCCESS
+Docker Image Check    : SUCCESS
+Tomcat Deployment     : SUCCESS
+Application Health    : SUCCESS
+Selenium Tests        : SUCCESS
+JUnit Results         : SUCCESS
 
-            echo 'GitHub Checkout       : SUCCESS'
-            echo 'Environment Check     : SUCCESS'
-            echo 'Maven Clean           : SUCCESS'
-            echo 'Maven Compile         : SUCCESS'
-            echo 'Maven Test            : SUCCESS'
-            echo 'WAR Packaging         : SUCCESS'
-            echo 'WAR Verification      : SUCCESS'
-            echo 'Docker Build          : SUCCESS'
-            echo 'Docker Verification   : SUCCESS'
-            echo 'Tomcat Deployment     : SUCCESS'
-            echo 'Application Health    : SUCCESS'
-            echo 'Selenium Tests        : SUCCESS'
-            echo 'JUnit Results         : SUCCESS'
-
-            echo '=================================================='
-            echo '       TASKNEXUS CI/CD COMPLETED'
-            echo '=================================================='
+==================================================
+              BUILD COMPLETED
+==================================================
+'''
         }
-
 
         failure {
+            echo '''
+==================================================
+          TASKNEXUS PIPELINE FAILED
+==================================================
 
-            echo ''
-            echo '=================================================='
-            echo '           TASKNEXUS PIPELINE FAILED'
-            echo '=================================================='
+Check the Console Output for the first failed stage.
 
-            echo 'The failed stage should be checked in Console Output.'
-
-            powershell '''
-
-                $ErrorActionPreference = "SilentlyContinue"
-
-                Write-Host "Docker containers:"
-
-                & "$env:DOCKER_EXE" ps -a
-
-                Write-Host "Docker logs:"
-
-                & "$env:DOCKER_EXE" logs $env:TEST_CONTAINER
-
-                exit 0
-            '''
+==================================================
+'''
         }
-
 
         always {
+            echo 'Performing cleanup...'
 
-            echo ''
-            echo '=================================================='
-            echo '              POST BUILD CLEANUP'
-            echo '=================================================='
-
-
-            archiveArtifacts(
-                artifacts: 'target/surefire-reports/*.xml',
-                allowEmptyArchive: true
-            )
-
-
-            archiveArtifacts(
-                artifacts: 'target/selenium-screenshots/*.png',
-                allowEmptyArchive: true
-            )
-
-
-            powershell '''
-
-                $ErrorActionPreference = "SilentlyContinue"
-
-                Write-Host "Removing temporary Jenkins container..."
-
-                & "$env:DOCKER_EXE" rm -f $env:TEST_CONTAINER
-
-                Write-Host "Temporary container cleanup completed."
-
-                exit 0
+            bat '''
+                "%DOCKER_EXE%" rm -f %CONTAINER_NAME% 2>NUL
+                exit /b 0
             '''
-
-
-            echo '=================================================='
-            echo '              CLEANUP COMPLETED'
-            echo '=================================================='
         }
     }
-    
 }
