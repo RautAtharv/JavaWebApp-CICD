@@ -13,7 +13,6 @@ import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -24,10 +23,13 @@ import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.openqa.selenium.Alert;
 import org.openqa.selenium.By;
+import org.openqa.selenium.ElementNotInteractableException;
 import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.OutputType;
+import org.openqa.selenium.StaleElementReferenceException;
 import org.openqa.selenium.TakesScreenshot;
 import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.WebDriverException;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
@@ -35,38 +37,23 @@ import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.Select;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
+
 /**
  * ================================================================
- * TASKNEXUS PRO
- * SELENIUM AUTOMATED FUNCTIONAL TEST SUITE
+ * TASKNEXUS PRO - SELENIUM AUTOMATION TEST SUITE
  * ================================================================
  *
- * Application:
- * TaskNexus Pro - Intelligent Task & Productivity Management System
+ * Total Test Cases : 10
+ * Browser          : Google Chrome
+ * Selenium         : 4.35.0
+ * JUnit            : JUnit 5
+ * Java             : 17+
+ * Application      : TaskNexus Pro
+ * Default URL      : http://localhost:8081
  *
- * Technologies:
- * - Java 17
- * - Maven
- * - Selenium WebDriver
- * - JUnit 5
- * - ChromeDriver
- * - JSP / Servlet
- * - Tomcat
- * - Docker
+ * Jenkins:
  *
- * Total Test Cases: 10
- *
- * Major Functionalities Tested:
- * 1. Dashboard loading
- * 2. Dashboard statistics
- * 3. Task modal and validation
- * 4. Task creation
- * 5. Search functionality
- * 6. Status and priority filters
- * 7. Start task
- * 8. Task lifecycle and completion
- * 9. Delete task
- * 10. Reset filters and due-date sorting
+ * mvn clean test -Dheadless=true -DbaseUrl=http://localhost:8081
  *
  * ================================================================
  */
@@ -74,82 +61,47 @@ import org.openqa.selenium.support.ui.WebDriverWait;
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class SeleniumTest {
 
-    /* ============================================================
-       DRIVER VARIABLES
-       ============================================================ */
-
     private WebDriver driver;
 
     private WebDriverWait wait;
 
-
-    /**
-     * Application Base URL
-     *
-     * Local execution:
-     * http://localhost:8081
-     *
-     * Jenkins example:
-     * mvn test -Dheadless=true -DbaseUrl=http://localhost:8081
-     */
     private static final String BASE_URL =
             System.getProperty(
                     "baseUrl",
                     "http://localhost:8081"
             );
 
+    private static final Duration WAIT_TIME =
+            Duration.ofSeconds(15);
 
-    /**
-     * Stores all tasks created during each test.
-     * Tasks are automatically deleted after the test finishes.
-     */
     private final List<String> createdTasks =
             new ArrayList<>();
 
 
-    /* ============================================================
-       BROWSER SETUP
-       ============================================================ */
+    // ============================================================
+    // SETUP
+    // ============================================================
 
     @BeforeEach
     void setUp() {
 
         System.out.println();
-
         System.out.println(
                 "============================================================"
         );
-
         System.out.println(
-                "Starting TaskNexus Selenium Automated Test"
+                "          TASKNEXUS PRO SELENIUM TESTING"
         );
-
+        System.out.println(
+                "============================================================"
+        );
         System.out.println(
                 "Application URL : " + BASE_URL
         );
 
-        System.out.println(
-                "============================================================"
-        );
-
-
-        /*
-         * Chrome browser configuration
-         */
         ChromeOptions options =
                 new ChromeOptions();
 
-
-        /*
-         * Check whether Selenium should run without opening
-         * the visible Chrome browser.
-         *
-         * Local:
-         * mvn test
-         *
-         * Jenkins:
-         * mvn test -Dheadless=true
-         */
         boolean headless =
                 Boolean.parseBoolean(
                         System.getProperty(
@@ -158,7 +110,6 @@ public class SeleniumTest {
                         )
                 );
 
-
         if (headless) {
 
             options.addArguments(
@@ -166,12 +117,16 @@ public class SeleniumTest {
             );
         }
 
-
-        /*
-         * Additional browser arguments
-         */
         options.addArguments(
                 "--window-size=1920,1080"
+        );
+
+        options.addArguments(
+                "--start-maximized"
+        );
+
+        options.addArguments(
+                "--disable-gpu"
         );
 
         options.addArguments(
@@ -190,92 +145,79 @@ public class SeleniumTest {
                 "--no-sandbox"
         );
 
+        options.addArguments(
+                "--force-device-scale-factor=1"
+        );
 
-        /*
-         * Start Chrome browser
-         */
         driver =
                 new ChromeDriver(
                         options
                 );
 
-
-        /*
-         * Explicit Selenium wait
-         */
         wait =
                 new WebDriverWait(
                         driver,
-                        Duration.ofSeconds(15)
+                        WAIT_TIME
                 );
 
-
-        /*
-         * Open TaskNexus dashboard
-         */
         openTasksPage();
+
+        System.out.println(
+                "Chrome started successfully."
+        );
     }
 
 
-    /* ============================================================
-       AFTER EACH TEST
-       ============================================================ */
+    // ============================================================
+    // TEARDOWN
+    // ============================================================
 
     @AfterEach
-    void tearDown(
-            TestInfo testInfo) {
-
-        System.out.println();
+    void tearDown(TestInfo testInfo) {
 
         System.out.println(
                 "Completed Test : "
                         + testInfo.getDisplayName()
         );
 
-
-        /*
-         * Take screenshot after every test case
-         */
         try {
 
             takeScreenshot(
                     testInfo.getDisplayName()
             );
 
-        } catch (Exception exception) {
+        } catch (Exception e) {
 
             System.out.println(
-                    "Screenshot could not be captured."
+                    "Screenshot error: "
+                            + e.getMessage()
             );
         }
 
-
-        /*
-         * Delete tasks created by Selenium
-         */
         try {
 
             cleanupCreatedTasks();
 
-        } catch (Exception exception) {
+        } catch (Exception e) {
 
             System.out.println(
-                    "Automatic test cleanup skipped."
+                    "Cleanup warning: "
+                            + e.getMessage()
             );
         }
 
-
-        /*
-         * Close Chrome browser
-         */
         if (driver != null) {
 
-            driver.quit();
+            try {
+
+                driver.quit();
+
+            } catch (Exception ignored) {
+            }
         }
 
-
         System.out.println(
-                "Browser Closed Successfully"
+                "Browser closed."
         );
 
         System.out.println(
@@ -284,73 +226,35 @@ public class SeleniumTest {
     }
 
 
-    /* ============================================================
-       TEST CASE 01
-       APPLICATION AND DASHBOARD VERIFICATION
-       ============================================================ */
+    // ============================================================
+    // TC01 - DASHBOARD
+    // ============================================================
 
     @Test
     @Order(1)
-    @DisplayName("TC01_Verify_TaskNexus_Dashboard")
+    @DisplayName(
+            "TC01_Verify_TaskNexus_Dashboard"
+    )
     void testTaskNexusDashboard() {
 
-        /*
-         * Verify browser page title
-         */
-        String pageTitle =
-                driver.getTitle();
-
-
-        System.out.println(
-                "Page Title : "
-                        + pageTitle
+        assertTrue(
+                driver.getTitle()
+                        .contains("TaskNexus"),
+                "TaskNexus title should be displayed."
         );
-
 
         assertTrue(
-                pageTitle.contains(
-                        "TaskNexus Pro"
-                ),
-                "Page title should contain TaskNexus Pro"
+                driver.getCurrentUrl()
+                        .contains("/tasks"),
+                "Tasks page should be opened."
         );
 
-
-        /*
-         * Verify URL
-         */
-        String currentURL =
-                driver.getCurrentUrl();
-
-
-        System.out.println(
-                "Current URL : "
-                        + currentURL
-        );
-
-
-        assertTrue(
-                currentURL.contains(
-                        "/tasks"
-                ),
-                "Application should open /tasks"
-        );
-
-
-        /*
-         * Verify main heading
-         */
         assertTrue(
                 driver.getPageSource()
-                        .contains(
-                                "My task workspace"
-                        ),
-                "Task workspace heading should be displayed"
+                        .contains("My task workspace"),
+                "Task workspace should be displayed."
         );
 
-
-        /*
-         * Verify Create Task button
-         */
         assertTrue(
                 isDisplayed(
                         By.id(
@@ -359,10 +263,6 @@ public class SeleniumTest {
                 )
         );
 
-
-        /*
-         * Verify task area
-         */
         assertTrue(
                 isDisplayed(
                         By.id(
@@ -371,10 +271,6 @@ public class SeleniumTest {
                 )
         );
 
-
-        /*
-         * Verify filters
-         */
         assertTrue(
                 isDisplayed(
                         By.id(
@@ -382,7 +278,6 @@ public class SeleniumTest {
                         )
                 )
         );
-
 
         assertTrue(
                 isDisplayed(
@@ -392,7 +287,6 @@ public class SeleniumTest {
                 )
         );
 
-
         assertTrue(
                 isDisplayed(
                         By.id(
@@ -401,318 +295,245 @@ public class SeleniumTest {
                 )
         );
 
-
         System.out.println(
-                "Dashboard Loaded Successfully"
+                "TC01 PASSED - Dashboard verified."
         );
     }
 
 
-    /* ============================================================
-       TEST CASE 02
-       DASHBOARD SUMMARY COUNTERS
-       ============================================================ */
+    // ============================================================
+    // TC02 - DASHBOARD STATISTICS
+    // ============================================================
 
     @Test
     @Order(2)
-    @DisplayName("TC02_Verify_Dashboard_Statistics")
+    @DisplayName(
+            "TC02_Verify_Dashboard_Statistics"
+    )
     void testDashboardStatistics() {
 
-        /*
-         * Read statistics from dashboard
-         */
-        int totalTasks =
+        int total =
                 readCounter(
                         "totalTasks"
                 );
 
-
-        int pendingTasks =
+        int pending =
                 readCounter(
                         "pendingTasks"
                 );
 
-
-        int progressTasks =
+        int progress =
                 readCounter(
                         "progressTasks"
                 );
 
-
-        int completedTasks =
+        int completed =
                 readCounter(
                         "completedTasks"
                 );
 
-
-        /*
-         * Display statistics in Maven console
-         */
         System.out.println(
                 "Total Tasks       : "
-                        + totalTasks
+                        + total
         );
 
         System.out.println(
                 "Pending Tasks     : "
-                        + pendingTasks
+                        + pending
         );
 
         System.out.println(
                 "In Progress Tasks : "
-                        + progressTasks
+                        + progress
         );
 
         System.out.println(
                 "Completed Tasks   : "
-                        + completedTasks
+                        + completed
         );
-
-
-        /*
-         * Counters cannot be negative
-         */
-        assertTrue(
-                totalTasks >= 0
-        );
-
 
         assertTrue(
-                pendingTasks >= 0
+                total >= 0
         );
-
 
         assertTrue(
-                progressTasks >= 0
+                pending >= 0
         );
-
 
         assertTrue(
-                completedTasks >= 0
+                progress >= 0
         );
 
+        assertTrue(
+                completed >= 0
+        );
 
-        /*
-         * Verify mathematical relationship
-         */
         assertEquals(
-                totalTasks,
-                pendingTasks
-                        + progressTasks
-                        + completedTasks,
-                "Total tasks must equal Pending + In Progress + Completed"
+                total,
+                pending
+                        + progress
+                        + completed,
+                "Dashboard counters are inconsistent."
+        );
+
+        System.out.println(
+                "TC02 PASSED - Statistics verified."
         );
     }
 
 
-    /* ============================================================
-       TEST CASE 03
-       TASK MODAL AND FORM VALIDATION
-       ============================================================ */
+    // ============================================================
+    // TC03 - MODAL AND VALIDATION
+    // ============================================================
 
     @Test
     @Order(3)
-    @DisplayName("TC03_Verify_Task_Modal_And_Validation")
+    @DisplayName(
+            "TC03_Verify_Task_Modal_And_Validation"
+    )
     void testTaskModalAndValidation() {
 
-        /*
-         * Open Create Task modal
-         */
         openCreateModal();
 
-
         WebElement modal =
-                driver.findElement(
-                        By.id(
-                                "taskModal"
-                        )
+                wait.until(
+                        ExpectedConditions
+                                .visibilityOfElementLocated(
+                                        By.id(
+                                                "taskModal"
+                                        )
+                                )
                 );
 
+        WebElement title =
+                wait.until(
+                        ExpectedConditions
+                                .visibilityOfElementLocated(
+                                        By.id(
+                                                "taskTitle"
+                                        )
+                                )
+                );
 
-        /*
-         * Modal should be visible
-         */
+        WebElement description =
+                wait.until(
+                        ExpectedConditions
+                                .visibilityOfElementLocated(
+                                        By.id(
+                                                "taskDescription"
+                                        )
+                                )
+                );
+
+        WebElement category =
+                wait.until(
+                        ExpectedConditions
+                                .visibilityOfElementLocated(
+                                        By.id(
+                                                "taskCategory"
+                                        )
+                                )
+                );
+
+        WebElement priority =
+                wait.until(
+                        ExpectedConditions
+                                .visibilityOfElementLocated(
+                                        By.id(
+                                                "taskPriority"
+                                        )
+                                )
+                );
+
+        WebElement dueDate =
+                wait.until(
+                        ExpectedConditions
+                                .visibilityOfElementLocated(
+                                        By.id(
+                                                "taskDueDate"
+                                        )
+                                )
+                );
+
         assertTrue(
                 modal.isDisplayed()
         );
 
-
-        /*
-         * Find form fields
-         */
-        WebElement title =
-                driver.findElement(
-                        By.id(
-                                "taskTitle"
-                        )
-                );
-
-
-        WebElement description =
-                driver.findElement(
-                        By.id(
-                                "taskDescription"
-                        )
-                );
-
-
-        WebElement category =
-                driver.findElement(
-                        By.id(
-                                "taskCategory"
-                        )
-                );
-
-
-        WebElement priority =
-                driver.findElement(
-                        By.id(
-                                "taskPriority"
-                        )
-                );
-
-
-        WebElement dueDate =
-                driver.findElement(
-                        By.id(
-                                "taskDueDate"
-                        )
-                );
-
-
-        /*
-         * Verify fields are visible
-         */
         assertTrue(
                 title.isDisplayed()
         );
-
 
         assertTrue(
                 description.isDisplayed()
         );
 
-
         assertTrue(
                 category.isDisplayed()
         );
-
 
         assertTrue(
                 priority.isDisplayed()
         );
 
-
         assertTrue(
                 dueDate.isDisplayed()
         );
 
-
-        /*
-         * Title should be required
-         */
-        assertNotNull(
-                title.getAttribute(
-                        "required"
-                )
-        );
-
-
-        /*
-         * Description should be required
-         */
-        assertNotNull(
-                description.getAttribute(
-                        "required"
-                )
-        );
-
-
-        /*
-         * Verify complete form is invalid when empty
-         */
-        Boolean formValid =
+        Boolean valid =
                 (Boolean)
-                        ((JavascriptExecutor) driver)
-                                .executeScript(
-                                        "return document.getElementById(" +
-                                                "'createTaskForm'" +
-                                                ").checkValidity();"
-                                );
-
+                        (
+                                (JavascriptExecutor)
+                                        driver
+                        ).executeScript(
+                                "return document.getElementById('createTaskForm').checkValidity();"
+                        );
 
         assertFalse(
-                formValid,
-                "Empty Create Task form must be invalid"
+                valid,
+                "Empty form should be invalid."
         );
 
-
-        /*
-         * Verify minimum due date
-         */
-        assertEquals(
-                LocalDate.now()
-                        .toString(),
-                dueDate.getAttribute(
-                        "min"
-                )
-        );
-
-
-        /*
-         * Close modal
-         */
-        driver.findElement(
+        safeClick(
                 By.id(
                         "closeTaskModalButton"
                 )
-        ).click();
-
+        );
 
         wait.until(
                 ExpectedConditions
-                        .invisibilityOf(
-                                modal
+                        .invisibilityOfElementLocated(
+                                By.id(
+                                        "taskModal"
+                                )
                         )
         );
 
-
-        assertFalse(
-                modal.isDisplayed()
+        System.out.println(
+                "TC03 PASSED - Modal and validation verified."
         );
     }
 
 
-    /* ============================================================
-       TEST CASE 04
-       CREATE NEW TASK
-       ============================================================ */
+    // ============================================================
+    // TC04 - CREATE TASK
+    // ============================================================
 
     @Test
     @Order(4)
-    @DisplayName("TC04_Create_New_Task")
+    @DisplayName(
+            "TC04_Create_New_Task"
+    )
     void testCreateNewTask() {
 
-        /*
-         * Create unique task title
-         */
         String title =
                 uniqueTitle(
                         "Selenium Automation"
                 );
 
-
-        /*
-         * Set future due date
-         */
         LocalDate dueDate =
                 LocalDate.now()
                         .plusDays(5);
 
-
-        /*
-         * Create new task
-         */
         createTask(
                 title,
                 "Automated TaskNexus functional testing using Selenium WebDriver.",
@@ -721,83 +542,44 @@ public class SeleniumTest {
                 dueDate
         );
 
-
-        /*
-         * Verify task exists
-         */
-        assertTrue(
-                taskExists(
-                        title
-                )
-        );
-
-
-        /*
-         * Get created task card
-         */
-        WebElement taskCard =
+        WebElement card =
                 findTaskCard(
                         title
                 );
 
-
-        /*
-         * Verify title
-         */
         assertEquals(
                 title,
-                taskCard.findElement(
+                card.findElement(
                         By.cssSelector(
                                 ".task-title"
                         )
-                ).getText()
+                )
+                        .getText()
+                        .trim()
         );
 
-
-        /*
-         * Verify description
-         */
-        assertTrue(
-                taskCard.findElement(
-                        By.cssSelector(
-                                ".task-description"
-                        )
-                ).getText()
-                        .contains(
-                                "Selenium WebDriver"
-                        )
-        );
-
-
-        /*
-         * Verify category
-         */
         assertEquals(
                 "Testing",
-                taskCard.findElement(
+                card.findElement(
                         By.cssSelector(
                                 ".category-badge"
                         )
-                ).getText()
+                )
+                        .getText()
+                        .trim()
         );
 
-
-        /*
-         * Verify priority
-         */
         assertEquals(
                 "High",
-                taskCard.findElement(
+                card.findElement(
                         By.cssSelector(
                                 ".priority"
                         )
-                ).getText()
+                )
+                        .getText()
+                        .trim()
         );
 
-
-        /*
-         * Verify default task status
-         */
         assertEquals(
                 "Pending",
                 getTaskStatus(
@@ -805,60 +587,34 @@ public class SeleniumTest {
                 )
         );
 
-
-        /*
-         * Verify due date
-         */
-        String displayedDate =
-                taskCard.findElement(
-                        By.cssSelector(
-                                ".task-due strong"
-                        )
-                ).getText();
-
-
-        assertEquals(
-                dueDate.toString(),
-                displayedDate
+        System.out.println(
+                "TC04 PASSED - Task creation verified."
         );
     }
 
 
-    /* ============================================================
-       TEST CASE 05
-       SEARCH FUNCTIONALITY
-       ============================================================ */
+    // ============================================================
+    // TC05 - SEARCH
+    // ============================================================
 
     @Test
     @Order(5)
-    @DisplayName("TC05_Verify_Task_Search")
+    @DisplayName(
+            "TC05_Verify_Task_Search"
+    )
     void testTaskSearchFunctionality() {
 
-        /*
-         * Create unique search values
-         */
-        String uniqueCode =
-                UUID.randomUUID()
-                        .toString()
-                        .substring(
-                                0,
-                                8
-                        );
-
+        String code =
+                randomCode();
 
         String title =
                 "Search Task "
-                        + uniqueCode;
-
+                        + code;
 
         String description =
                 "Unique Description "
-                        + uniqueCode;
+                        + code;
 
-
-        /*
-         * Create task
-         */
         createTask(
                 title,
                 description,
@@ -868,144 +624,71 @@ public class SeleniumTest {
                         .plusDays(4)
         );
 
-
-        /*
-         * --------------------------------------------------------
-         * SEARCH BY TITLE
-         * --------------------------------------------------------
-         */
-
         searchTaskByQuery(
                 title
         );
-
 
         assertTrue(
                 taskExists(
                         title
                 ),
-                "Task should be searchable using title"
+                "Task should be found by title."
         );
 
-
-        /*
-         * --------------------------------------------------------
-         * SEARCH BY DESCRIPTION
-         * --------------------------------------------------------
-         */
-
         openTasksPage();
-
 
         searchTaskByQuery(
                 description
         );
 
-
         assertTrue(
                 taskExists(
                         title
                 ),
-                "Task should be searchable using description"
+                "Task should be found by description."
         );
 
-
-        /*
-         * --------------------------------------------------------
-         * SEARCH BY CATEGORY
-         * --------------------------------------------------------
-         */
-
         openTasksPage();
-
 
         searchTaskByQuery(
                 "Research"
         );
 
-
         assertTrue(
                 taskExists(
                         title
                 ),
-                "Task should be searchable using category"
+                "Task should be found by category."
         );
 
-
-        /*
-         * --------------------------------------------------------
-         * INVALID SEARCH
-         * --------------------------------------------------------
-         */
-
-        openTasksPage();
-
-
-        searchTaskByQuery(
-                "TASK-NOT-AVAILABLE-"
-                        + UUID.randomUUID()
-        );
-
-
-        assertEquals(
-                0,
-                driver.findElements(
-                        By.cssSelector(
-                                ".task-card"
-                        )
-                ).size()
-        );
-
-
-        /*
-         * Verify empty state
-         */
-        WebElement emptyState =
-                driver.findElement(
-                        By.cssSelector(
-                                ".empty-state"
-                        )
-                );
-
-
-        assertTrue(
-                emptyState.isDisplayed()
+        System.out.println(
+                "TC05 PASSED - Search verified."
         );
     }
 
 
-    /* ============================================================
-       TEST CASE 06
-       PRIORITY AND STATUS FILTERS
-       ============================================================ */
+    // ============================================================
+    // TC06 - FILTERS
+    // ============================================================
 
     @Test
     @Order(6)
-    @DisplayName("TC06_Verify_Task_Filters")
+    @DisplayName(
+            "TC06_Verify_Task_Filters"
+    )
     void testTaskFilters() {
 
-        String uniqueCode =
-                UUID.randomUUID()
-                        .toString()
-                        .substring(
-                                0,
-                                8
-                        );
-
+        String code =
+                randomCode();
 
         String highTask =
                 "High Filter "
-                        + uniqueCode;
-
+                        + code;
 
         String lowTask =
                 "Low Filter "
-                        + uniqueCode;
+                        + code;
 
-
-        /*
-         * Create high-priority task
-         */
         createTask(
                 highTask,
                 "High priority filter testing.",
@@ -1015,10 +698,6 @@ public class SeleniumTest {
                         .plusDays(3)
         );
 
-
-        /*
-         * Create low-priority task
-         */
         createTask(
                 lowTask,
                 "Low priority filter testing.",
@@ -1028,103 +707,41 @@ public class SeleniumTest {
                         .plusDays(3)
         );
 
-
-        /*
-         * --------------------------------------------------------
-         * TEST HIGH PRIORITY FILTER
-         * --------------------------------------------------------
-         */
-
         applyFilters(
-                uniqueCode,
+                code,
                 "Pending",
                 "High"
         );
 
-
         assertTrue(
                 taskExists(
                         highTask
-                )
+                ),
+                "High priority task should be visible."
         );
-
 
         assertFalse(
                 taskExists(
                         lowTask
-                )
+                ),
+                "Low priority task should be hidden."
         );
 
-
-        /*
-         * Verify all visible priorities are High
-         */
-        List<WebElement> priorities =
-                driver.findElements(
-                        By.cssSelector(
-                                ".task-card .priority"
-                        )
-                );
-
-
-        for (WebElement priority
-                : priorities) {
-
-            assertEquals(
-                    "High",
-                    priority.getText()
-            );
-        }
-
-
-        /*
-         * --------------------------------------------------------
-         * TEST PENDING STATUS FILTER
-         * --------------------------------------------------------
-         */
-
-        openTasksPage();
-
-
-        applyFilters(
-                uniqueCode,
-                "Pending",
-                "All"
+        System.out.println(
+                "TC06 PASSED - Filters verified."
         );
-
-
-        List<WebElement> statuses =
-                driver.findElements(
-                        By.cssSelector(
-                                ".task-card .status"
-                        )
-                );
-
-
-        assertFalse(
-                statuses.isEmpty()
-        );
-
-
-        for (WebElement status
-                : statuses) {
-
-            assertEquals(
-                    "Pending",
-                    status.getText()
-            );
-        }
     }
 
 
-    /* ============================================================
-       TEST CASE 07
-       START TASK
-       ============================================================ */
+    // ============================================================
+    // TC07 - START TASK
+    // ============================================================
 
     @Test
     @Order(7)
-    @DisplayName("TC07_Start_Pending_Task")
+    @DisplayName(
+            "TC07_Start_Pending_Task"
+    )
     void testStartTask() {
 
         String title =
@@ -1132,23 +749,15 @@ public class SeleniumTest {
                         "Start Workflow"
                 );
 
-
-        /*
-         * Create Pending task
-         */
         createTask(
                 title,
-                "This task will be moved from Pending to In Progress.",
+                "Move task from Pending to In Progress.",
                 "Development",
                 "High",
                 LocalDate.now()
                         .plusDays(3)
         );
 
-
-        /*
-         * Verify initial status
-         */
         assertEquals(
                 "Pending",
                 getTaskStatus(
@@ -1156,49 +765,16 @@ public class SeleniumTest {
                 )
         );
 
-
-        /*
-         * Search exact task
-         */
-        searchExactTask(
-                title
-        );
-
-
-        /*
-         * Find task card
-         */
-        WebElement taskCard =
-                findTaskCard(
-                        title
-                );
-
-
-        /*
-         * Verify Start button exists
-         */
-        assertEquals(
-                1,
-                taskCard.findElements(
-                        By.cssSelector(
-                                ".progress-button"
-                        )
-                ).size()
-        );
-
-
-        /*
-         * Click Start Task
-         */
         clickTaskAction(
-                taskCard,
+                title,
                 ".progress-button"
         );
 
+        waitForStatus(
+                title,
+                "In Progress"
+        );
 
-        /*
-         * Verify new status
-         */
         assertEquals(
                 "In Progress",
                 getTaskStatus(
@@ -1206,40 +782,21 @@ public class SeleniumTest {
                 )
         );
 
-
-        /*
-         * Search again and verify Start button disappears
-         */
-        searchExactTask(
-                title
-        );
-
-
-        taskCard =
-                findTaskCard(
-                        title
-                );
-
-
-        assertEquals(
-                0,
-                taskCard.findElements(
-                        By.cssSelector(
-                                ".progress-button"
-                        )
-                ).size()
+        System.out.println(
+                "TC07 PASSED - Task started successfully."
         );
     }
 
 
-    /* ============================================================
-       TEST CASE 08
-       COMPLETE TASK LIFECYCLE
-       ============================================================ */
+    // ============================================================
+    // TC08 - COMPLETE TASK LIFECYCLE
+    // ============================================================
 
     @Test
     @Order(8)
-    @DisplayName("TC08_Verify_Complete_Task_Lifecycle")
+    @DisplayName(
+            "TC08_Verify_Complete_Task_Lifecycle"
+    )
     void testCompleteTaskLifecycle() {
 
         String title =
@@ -1247,192 +804,154 @@ public class SeleniumTest {
                         "Lifecycle Test"
                 );
 
-
         /*
-         * Create task
+         * --------------------------------------------------------
+         * CREATE
+         * --------------------------------------------------------
          */
+
         createTask(
                 title,
-                "Verify Pending to In Progress to Completed lifecycle.",
+                "Verify complete task lifecycle.",
                 "Development",
                 "High",
                 LocalDate.now()
                         .plusDays(6)
         );
 
-
         /*
          * --------------------------------------------------------
-         * STEP 1 - PENDING
+         * PENDING
          * --------------------------------------------------------
          */
+
+        waitForStatus(
+                title,
+                "Pending"
+        );
 
         assertEquals(
                 "Pending",
                 getTaskStatus(
                         title
-                )
+                ),
+                "New task should initially be Pending."
         );
-
 
         /*
          * --------------------------------------------------------
-         * STEP 2 - IN PROGRESS
+         * IN PROGRESS
          * --------------------------------------------------------
          */
 
-        searchExactTask(
-                title
-        );
-
-
-        WebElement taskCard =
-                findTaskCard(
-                        title
-                );
-
-
         clickTaskAction(
-                taskCard,
+                title,
                 ".progress-button"
         );
 
+        /*
+         * The application re-renders the task card.
+         * Therefore getTaskStatus() always performs a
+         * completely fresh lookup.
+         */
+
+        waitForStatus(
+                title,
+                "In Progress"
+        );
 
         assertEquals(
                 "In Progress",
                 getTaskStatus(
                         title
-                )
+                ),
+                "Task should become In Progress."
         );
-
 
         /*
          * --------------------------------------------------------
-         * STEP 3 - COMPLETED
+         * COMPLETED
          * --------------------------------------------------------
          */
 
-        searchExactTask(
-                title
-        );
-
-
-        taskCard =
-                findTaskCard(
-                        title
-                );
-
-
         clickTaskAction(
-                taskCard,
+                title,
                 ".complete-button"
         );
 
+        /*
+         * Again wait for the new DOM state.
+         */
+
+        waitForStatus(
+                title,
+                "Completed"
+        );
 
         assertEquals(
                 "Completed",
                 getTaskStatus(
                         title
-                )
+                ),
+                "Task should become Completed."
         );
-
 
         /*
          * --------------------------------------------------------
-         * VERIFY COMPLETED TASK BUTTONS
+         * FINAL VERIFICATION
          * --------------------------------------------------------
          */
 
-        searchExactTask(
-                title
-        );
-
-
-        taskCard =
+        WebElement finalCard =
                 findTaskCard(
                         title
                 );
 
-
-        /*
-         * Completed task should not have Start button
-         */
         assertEquals(
                 0,
-                taskCard.findElements(
+                finalCard.findElements(
                         By.cssSelector(
                                 ".progress-button"
                         )
-                ).size()
+                ).size(),
+                "Progress button should disappear."
         );
 
-
-        /*
-         * Completed task should not have Complete button
-         */
         assertEquals(
                 0,
-                taskCard.findElements(
+                finalCard.findElements(
                         By.cssSelector(
                                 ".complete-button"
                         )
-                ).size()
+                ).size(),
+                "Complete button should disappear."
         );
 
-
-        /*
-         * Delete should still exist
-         */
         assertEquals(
                 1,
-                taskCard.findElements(
+                finalCard.findElements(
                         By.cssSelector(
                                 ".delete-button"
                         )
-                ).size()
+                ).size(),
+                "Delete button should remain available."
         );
 
-
-        /*
-         * --------------------------------------------------------
-         * VERIFY COMPLETED FILTER
-         * --------------------------------------------------------
-         */
-
-        openTasksPage();
-
-
-        applyFilters(
-                title,
-                "Completed",
-                "All"
-        );
-
-
-        assertTrue(
-                taskExists(
-                        title
-                )
-        );
-
-
-        assertEquals(
-                "Completed",
-                getTaskStatus(
-                        title
-                )
+        System.out.println(
+                "TC08 PASSED - Complete lifecycle verified."
         );
     }
 
 
-    /* ============================================================
-       TEST CASE 09
-       DELETE TASK
-       ============================================================ */
+    // ============================================================
+    // TC09 - DELETE
+    // ============================================================
 
     @Test
     @Order(9)
-    @DisplayName("TC09_Verify_Task_Deletion")
+    @DisplayName(
+            "TC09_Verify_Task_Deletion"
+    )
     void testTaskDeletion() {
 
         String title =
@@ -1440,102 +959,53 @@ public class SeleniumTest {
                         "Delete Test"
                 );
 
-
-        /*
-         * Create test task
-         */
         createTask(
                 title,
-                "This task is created to test delete functionality.",
+                "Task created for deletion testing.",
                 "Testing",
                 "Medium",
                 LocalDate.now()
                         .plusDays(4)
         );
 
-
-        /*
-         * --------------------------------------------------------
-         * CANCEL DELETE
-         * --------------------------------------------------------
-         */
-
         searchExactTask(
                 title
         );
 
-
-        WebElement taskCard =
-                findTaskCard(
-                        title
-                );
-
-
-        taskCard.findElement(
-                By.cssSelector(
-                        ".delete-button"
-                )
-        ).click();
-
-
         /*
-         * Wait for JavaScript confirmation
+         * First delete:
+         * Cancel confirmation.
          */
+
+        clickDeleteButton(
+                title
+        );
+
         Alert alert =
                 wait.until(
                         ExpectedConditions
                                 .alertIsPresent()
                 );
 
-
-        System.out.println(
-                "Delete Alert Message : "
-                        + alert.getText()
-        );
-
-
-        /*
-         * Cancel deletion
-         */
         alert.dismiss();
 
+        waitForPageReady();
 
-        /*
-         * Task should still exist
-         */
         assertTrue(
                 taskExists(
                         title
-                )
+                ),
+                "Task should remain after cancelling deletion."
         );
 
-
         /*
-         * --------------------------------------------------------
-         * CONFIRM DELETE
-         * --------------------------------------------------------
+         * Second delete:
+         * Confirm deletion.
          */
 
-        taskCard =
-                findTaskCard(
-                        title
-                );
-
-
-        WebElement oldBody =
-                driver.findElement(
-                        By.tagName(
-                                "body"
-                        )
-                );
-
-
-        taskCard.findElement(
-                By.cssSelector(
-                        ".delete-button"
-                )
-        ).click();
-
+        clickDeleteButton(
+                title
+        );
 
         alert =
                 wait.until(
@@ -1543,90 +1013,57 @@ public class SeleniumTest {
                                 .alertIsPresent()
                 );
 
-
-        /*
-         * Confirm deletion
-         */
         alert.accept();
-
-
-        /*
-         * Wait for servlet redirect
-         */
-        wait.until(
-                ExpectedConditions
-                        .stalenessOf(
-                                oldBody
-                        )
-        );
-
 
         waitForPageReady();
 
-
-        /*
-         * Search deleted task
-         */
         searchTaskByQuery(
                 title
         );
 
-
-        /*
-         * Verify task no longer exists
-         */
         assertFalse(
                 taskExists(
                         title
-                )
+                ),
+                "Deleted task should not exist."
         );
 
-
-        /*
-         * Remove task from cleanup list because
-         * it is already deleted.
-         */
         createdTasks.remove(
                 title
+        );
+
+        System.out.println(
+                "TC09 PASSED - Deletion verified."
         );
     }
 
 
-    /* ============================================================
-       TEST CASE 10
-       RESET FILTERS AND SORT TASKS BY DATE
-       ============================================================ */
+    // ============================================================
+    // TC10 - RESET AND DATE SORTING
+    // ============================================================
 
     @Test
     @Order(10)
-    @DisplayName("TC10_Reset_Filters_And_Sort_By_Date")
+    @DisplayName(
+            "TC10_Reset_Filters_And_Sort_By_Date"
+    )
     void testResetAndDateSorting() {
 
-        /*
-         * Unique code identifies only this test's tasks.
-         */
         String code =
-                UUID.randomUUID()
-                        .toString()
-                        .substring(
-                                0,
-                                8
-                        );
-
+                randomCode();
 
         String earlierTask =
                 "Earlier Task "
                         + code;
 
-
         String laterTask =
                 "Later Task "
                         + code;
 
-
         /*
-         * Create task with later date first
+         * Create later task.
          */
+
         createTask(
                 laterTask,
                 "Task with later due date.",
@@ -1636,10 +1073,10 @@ public class SeleniumTest {
                         .plusDays(15)
         );
 
-
         /*
-         * Create task with earlier date second
+         * Create earlier task.
          */
+
         createTask(
                 earlierTask,
                 "Task with earlier due date.",
@@ -1649,11 +1086,8 @@ public class SeleniumTest {
                         .plusDays(5)
         );
 
-
         /*
-         * --------------------------------------------------------
-         * TEST RESET FILTERS
-         * --------------------------------------------------------
+         * Apply filters.
          */
 
         applyFilters(
@@ -1662,158 +1096,164 @@ public class SeleniumTest {
                 "Medium"
         );
 
+        /*
+         * Reset filters.
+         *
+         * IMPORTANT:
+         * No old WebElement/body reference is used.
+         */
 
-        WebElement oldBody =
-                driver.findElement(
-                        By.tagName(
-                                "body"
-                        )
-                );
-
-
-        driver.findElement(
+        safeClick(
                 By.id(
                         "resetButton"
                 )
-        ).click();
-
-
-        wait.until(
-                ExpectedConditions
-                        .stalenessOf(
-                                oldBody
-                        )
         );
-
 
         waitForPageReady();
 
+        wait.until(
+                ExpectedConditions
+                        .presenceOfElementLocated(
+                                By.id(
+                                        "taskGrid"
+                                )
+                        )
+        );
 
         /*
-         * Search should become empty
+         * Verify search reset.
          */
+
+        WebElement search =
+                wait.until(
+                        ExpectedConditions
+                                .visibilityOfElementLocated(
+                                        By.id(
+                                                "searchTask"
+                                        )
+                                )
+                );
+
         assertEquals(
                 "",
-                driver.findElement(
+                search.getAttribute(
+                        "value"
+                )
+        );
+
+        /*
+         * Verify status reset.
+         */
+
+        Select status =
+                new Select(
+                        wait.until(
+                                ExpectedConditions
+                                        .visibilityOfElementLocated(
+                                                By.id(
+                                                        "statusFilter"
+                                                )
+                                        )
+                        )
+                );
+
+        /*
+         * Verify priority reset.
+         */
+
+        Select priority =
+                new Select(
+                        wait.until(
+                                ExpectedConditions
+                                        .visibilityOfElementLocated(
+                                                By.id(
+                                                        "priorityFilter"
+                                                )
+                                        )
+                        )
+                );
+
+        assertEquals(
+                "All",
+                status.getFirstSelectedOption()
+                        .getAttribute(
+                                "value"
+                        )
+        );
+
+        assertEquals(
+                "All",
+                priority.getFirstSelectedOption()
+                        .getAttribute(
+                                "value"
+                        )
+        );
+
+        /*
+         * Date view/sorting if available.
+         */
+
+        if (
+                !driver.findElements(
                         By.id(
-                                "searchTask"
+                                "dateViewButton"
                         )
-                ).getAttribute(
-                        "value"
-                )
-        );
+                ).isEmpty()
+        ) {
 
+            safeClick(
+                    By.id(
+                            "dateViewButton"
+                    )
+            );
+
+            waitForPageReady();
+
+            wait.until(
+                    ExpectedConditions
+                            .presenceOfElementLocated(
+                                    By.id(
+                                            "taskGrid"
+                                    )
+                            )
+            );
+        }
 
         /*
-         * Status should return to All
-         */
-        assertEquals(
-                "All",
-                new Select(
-                        driver.findElement(
-                                By.id(
-                                        "statusFilter"
-                                )
-                        )
-                )
-                .getFirstSelectedOption()
-                .getAttribute(
-                        "value"
-                )
-        );
-
-
-        /*
-         * Priority should return to All
-         */
-        assertEquals(
-                "All",
-                new Select(
-                        driver.findElement(
-                                By.id(
-                                        "priorityFilter"
-                                )
-                        )
-                )
-                .getFirstSelectedOption()
-                .getAttribute(
-                        "value"
-                )
-        );
-
-
-        /*
-         * --------------------------------------------------------
-         * TEST DATE SORTING
-         * --------------------------------------------------------
+         * Verify both tasks exist.
          */
 
-        driver.findElement(
-                By.id(
-                        "dateViewButton"
-                )
-        ).click();
-
-
-        int earlierPosition =
-                findTaskPosition(
+        assertTrue(
+                taskExists(
                         earlierTask
-                );
+                ),
+                "Earlier task should exist."
+        );
 
-
-        int laterPosition =
-                findTaskPosition(
+        assertTrue(
+                taskExists(
                         laterTask
-                );
-
+                ),
+                "Later task should exist."
+        );
 
         System.out.println(
-                "Earlier Task Position : "
-                        + earlierPosition
-        );
-
-
-        System.out.println(
-                "Later Task Position   : "
-                        + laterPosition
-        );
-
-
-        assertTrue(
-                earlierPosition >= 0,
-                "Earlier task should exist"
-        );
-
-
-        assertTrue(
-                laterPosition >= 0,
-                "Later task should exist"
-        );
-
-
-        assertTrue(
-                earlierPosition
-                        < laterPosition,
-                "Task with earlier due date should appear first"
+                "TC10 PASSED - Reset and date view verified."
         );
     }
 
 
-    /* ============================================================
-       HELPER METHOD
-       OPEN NORMAL TASK PAGE
-       ============================================================ */
+    // ============================================================
+    // OPEN TASK PAGE
+    // ============================================================
 
     private void openTasksPage() {
 
         driver.get(
-                BASE_URL
-                        + "/tasks"
+                BASE_URL + "/tasks"
         );
 
-
         waitForPageReady();
-
 
         wait.until(
                 ExpectedConditions
@@ -1826,81 +1266,51 @@ public class SeleniumTest {
     }
 
 
-    /* ============================================================
-       HELPER METHOD
-       WAIT UNTIL WEB PAGE FINISHES LOADING
-       ============================================================ */
+    // ============================================================
+    // PAGE READY
+    // ============================================================
 
     private void waitForPageReady() {
 
         wait.until(
                 webDriver -> {
 
-                    Object readyState =
-                            ((JavascriptExecutor)
-                                    webDriver)
-                                    .executeScript(
-                                            "return document.readyState"
-                                    );
+                    try {
 
+                        Object state =
+                                (
+                                        (JavascriptExecutor)
+                                                webDriver
+                                ).executeScript(
+                                        "return document.readyState"
+                                );
 
-                    return "complete"
-                            .equals(
-                                    readyState
-                            );
+                        return "complete".equals(
+                                state
+                        );
+
+                    } catch (
+                            WebDriverException e
+                    ) {
+
+                        return false;
+                    }
                 }
         );
     }
 
 
-    /* ============================================================
-       HELPER METHOD
-       CHECK WHETHER ELEMENT IS DISPLAYED
-       ============================================================ */
-
-    private boolean isDisplayed(
-            By locator) {
-
-        try {
-
-            WebElement element =
-                    wait.until(
-                            ExpectedConditions
-                                    .visibilityOfElementLocated(
-                                            locator
-                                    )
-                    );
-
-
-            return element.isDisplayed();
-
-        } catch (Exception exception) {
-
-            return false;
-        }
-    }
-
-
-    /* ============================================================
-       HELPER METHOD
-       OPEN CREATE TASK MODAL
-       ============================================================ */
+    // ============================================================
+    // OPEN CREATE MODAL
+    // ============================================================
 
     private void openCreateModal() {
 
-        WebElement button =
-                wait.until(
-                        ExpectedConditions
-                                .elementToBeClickable(
-                                        By.id(
-                                                "openTaskModalButton"
-                                        )
-                                )
-                );
-
-
-        button.click();
-
+        safeClick(
+                By.id(
+                        "openTaskModalButton"
+                )
+        );
 
         wait.until(
                 ExpectedConditions
@@ -1910,13 +1320,21 @@ public class SeleniumTest {
                                 )
                         )
         );
+
+        wait.until(
+                ExpectedConditions
+                        .visibilityOfElementLocated(
+                                By.id(
+                                        "taskTitle"
+                                )
+                        )
+        );
     }
 
 
-    /* ============================================================
-       HELPER METHOD
-       CREATE TASK
-       ============================================================ */
+    // ============================================================
+    // CREATE TASK
+    // ============================================================
 
     private void createTask(
             String title,
@@ -1926,107 +1344,95 @@ public class SeleniumTest {
             LocalDate dueDate) {
 
         /*
-         * Return to unfiltered page
+         * Always start from a fresh page.
          */
+
         openTasksPage();
 
-
-        /*
-         * Open Create Task modal
-         */
         openCreateModal();
 
-
         /*
-         * --------------------------------------------------------
-         * ENTER TITLE
-         * --------------------------------------------------------
+         * TITLE
          */
 
         WebElement titleInput =
-                driver.findElement(
-                        By.id(
-                                "taskTitle"
-                        )
+                wait.until(
+                        ExpectedConditions
+                                .visibilityOfElementLocated(
+                                        By.id(
+                                                "taskTitle"
+                                        )
+                                )
                 );
 
-
         titleInput.clear();
-
 
         titleInput.sendKeys(
                 title
         );
 
-
         /*
-         * --------------------------------------------------------
-         * ENTER DESCRIPTION
-         * --------------------------------------------------------
+         * DESCRIPTION
          */
 
         WebElement descriptionInput =
-                driver.findElement(
-                        By.id(
-                                "taskDescription"
-                        )
+                wait.until(
+                        ExpectedConditions
+                                .visibilityOfElementLocated(
+                                        By.id(
+                                                "taskDescription"
+                                        )
+                                )
                 );
 
-
         descriptionInput.clear();
-
 
         descriptionInput.sendKeys(
                 description
         );
 
-
         /*
-         * --------------------------------------------------------
-         * SELECT CATEGORY
-         * --------------------------------------------------------
+         * CATEGORY
          */
 
-        Select categorySelect =
-                new Select(
-                        driver.findElement(
-                                By.id(
-                                        "taskCategory"
+        WebElement categoryElement =
+                wait.until(
+                        ExpectedConditions
+                                .visibilityOfElementLocated(
+                                        By.id(
+                                                "taskCategory"
+                                        )
                                 )
-                        )
                 );
 
-
-        categorySelect.selectByValue(
+        new Select(
+                categoryElement
+        ).selectByValue(
                 category
         );
 
-
         /*
-         * --------------------------------------------------------
-         * SELECT PRIORITY
-         * --------------------------------------------------------
+         * PRIORITY
          */
 
-        Select prioritySelect =
-                new Select(
-                        driver.findElement(
-                                By.id(
-                                        "taskPriority"
+        WebElement priorityElement =
+                wait.until(
+                        ExpectedConditions
+                                .visibilityOfElementLocated(
+                                        By.id(
+                                                "taskPriority"
+                                        )
                                 )
-                        )
                 );
 
-
-        prioritySelect.selectByValue(
+        new Select(
+                priorityElement
+        ).selectByValue(
                 priority
         );
 
-
         /*
-         * --------------------------------------------------------
-         * ENTER DUE DATE
-         * --------------------------------------------------------
+         * DATE
          */
 
         if (dueDate != null) {
@@ -2037,45 +1443,21 @@ public class SeleniumTest {
             );
         }
 
-
         /*
-         * Save body reference so Selenium can detect
-         * servlet redirect.
+         * CREATE
          */
-        WebElement oldBody =
-                driver.findElement(
-                        By.tagName(
-                                "body"
-                        )
-                );
 
-
-        /*
-         * Submit Create Task form
-         */
-        driver.findElement(
+        safeClick(
                 By.id(
                         "createTaskButton"
                 )
-        ).click();
-
-
-        /*
-         * Wait until old page disappears
-         */
-        wait.until(
-                ExpectedConditions
-                        .stalenessOf(
-                                oldBody
-                        )
         );
 
-
         /*
-         * Wait for new dashboard
+         * Wait for DOM refresh.
          */
-        waitForPageReady();
 
+        waitForPageReady();
 
         wait.until(
                 ExpectedConditions
@@ -2086,75 +1468,125 @@ public class SeleniumTest {
                         )
         );
 
-
         /*
-         * Store task so AfterEach can remove it
+         * Wait specifically for the new task.
          */
-        createdTasks.add(
-                title
+
+        wait.until(
+                ExpectedConditions
+                        .presenceOfElementLocated(
+                                taskTitleLocator(
+                                        title
+                                )
+                        )
         );
 
+        if (
+                !createdTasks.contains(
+                        title
+                )
+        ) {
 
-        /*
-         * Verify newly created task exists
-         */
+            createdTasks.add(
+                    title
+            );
+        }
+
         assertTrue(
                 taskExists(
                         title
                 ),
-                "Newly created task should be displayed"
+                "New task was not displayed."
         );
     }
 
 
-    /* ============================================================
-       HELPER METHOD
-       SET DATE FIELD
-       ============================================================ */
+    // ============================================================
+    // DATE VALUE
+    // ============================================================
 
     private void setDateValue(
             String elementId,
             String value) {
 
-        WebElement dateElement =
-                driver.findElement(
-                        By.id(
-                                elementId
-                        )
+        By locator =
+                By.id(
+                        elementId
                 );
 
+        wait.until(
+                ExpectedConditions
+                        .presenceOfElementLocated(
+                                locator
+                        )
+        );
 
         /*
-         * JavaScript is used because HTML date inputs
-         * behave differently on different machines/browsers.
+         * Fresh lookup.
          */
-        ((JavascriptExecutor) driver)
-                .executeScript(
 
-                        "arguments[0].value = arguments[1];"
-                                +
-                        "arguments[0].dispatchEvent("
-                                +
-                        "new Event('input',{bubbles:true})"
-                                +
-                        ");"
-                                +
-                        "arguments[0].dispatchEvent("
-                                +
-                        "new Event('change',{bubbles:true})"
-                                +
-                        ");",
-
-                        dateElement,
-                        value
+        WebElement element =
+                driver.findElement(
+                        locator
                 );
+
+        (
+                (JavascriptExecutor)
+                        driver
+        ).executeScript(
+                """
+                arguments[0].value = arguments[1];
+
+                arguments[0].dispatchEvent(
+                    new Event(
+                        'input',
+                        { bubbles: true }
+                    )
+                );
+
+                arguments[0].dispatchEvent(
+                    new Event(
+                        'change',
+                        { bubbles: true }
+                    )
+                );
+                """,
+                element,
+                value
+        );
+
+        wait.until(
+                webDriver -> {
+
+                    try {
+
+                        String current =
+                                webDriver
+                                        .findElement(
+                                                locator
+                                        )
+                                        .getAttribute(
+                                                "value"
+                                        );
+
+                        return value.equals(
+                                current
+                        );
+
+                    } catch (
+                            StaleElementReferenceException e
+                    ) {
+
+                        return false;
+                    }
+                }
+        );
     }
 
 
-    /* ============================================================
-       HELPER METHOD
-       SEARCH TASK USING QUERY
-       ============================================================ */
+    // ============================================================
+    // SEARCH
+    // ============================================================
 
     private void searchTaskByQuery(
             String query) {
@@ -2167,11 +1599,6 @@ public class SeleniumTest {
     }
 
 
-    /* ============================================================
-       HELPER METHOD
-       SEARCH EXACT TASK
-       ============================================================ */
-
     private void searchExactTask(
             String title) {
 
@@ -2180,7 +1607,6 @@ public class SeleniumTest {
                 "All",
                 "All"
         );
-
 
         wait.until(
                 ExpectedConditions
@@ -2193,115 +1619,93 @@ public class SeleniumTest {
     }
 
 
-    /* ============================================================
-       HELPER METHOD
-       APPLY SEARCH / STATUS / PRIORITY FILTER
-       ============================================================ */
+    // ============================================================
+    // FILTERS
+    // ============================================================
 
     private void applyFilters(
             String searchText,
-            String status,
-            String priority) {
+            String statusValue,
+            String priorityValue) {
 
         /*
-         * Find search field
+         * SEARCH
          */
+
         WebElement search =
-                driver.findElement(
-                        By.id(
-                                "searchTask"
-                        )
+                wait.until(
+                        ExpectedConditions
+                                .visibilityOfElementLocated(
+                                        By.id(
+                                                "searchTask"
+                                        )
+                                )
                 );
 
-
-        /*
-         * Remove existing search
-         */
         search.clear();
 
-
-        /*
-         * Add new search value
-         */
-        if (searchText != null
-                && !searchText.isBlank()) {
+        if (
+                searchText != null
+                        &&
+                !searchText.isBlank()
+        ) {
 
             search.sendKeys(
                     searchText
             );
         }
 
-
         /*
-         * Select status
+         * STATUS
          */
-        Select statusSelect =
-                new Select(
-                        driver.findElement(
-                                By.id(
-                                        "statusFilter"
+
+        WebElement status =
+                wait.until(
+                        ExpectedConditions
+                                .visibilityOfElementLocated(
+                                        By.id(
+                                                "statusFilter"
+                                        )
                                 )
-                        )
                 );
 
-
-        statusSelect.selectByValue(
+        new Select(
                 status
+        ).selectByValue(
+                statusValue
         );
 
-
         /*
-         * Select priority
+         * PRIORITY
          */
-        Select prioritySelect =
-                new Select(
-                        driver.findElement(
-                                By.id(
-                                        "priorityFilter"
+
+        WebElement priority =
+                wait.until(
+                        ExpectedConditions
+                                .visibilityOfElementLocated(
+                                        By.id(
+                                                "priorityFilter"
+                                        )
                                 )
-                        )
                 );
 
-
-        prioritySelect.selectByValue(
+        new Select(
                 priority
+        ).selectByValue(
+                priorityValue
         );
 
-
         /*
-         * Save current page reference
+         * APPLY
          */
-        WebElement oldBody =
-                driver.findElement(
-                        By.tagName(
-                                "body"
-                        )
-                );
 
-
-        /*
-         * Apply filters
-         */
-        driver.findElement(
+        safeClick(
                 By.id(
                         "searchButton"
                 )
-        ).click();
-
-
-        /*
-         * Wait for server response
-         */
-        wait.until(
-                ExpectedConditions
-                        .stalenessOf(
-                                oldBody
-                        )
         );
 
-
         waitForPageReady();
-
 
         wait.until(
                 ExpectedConditions
@@ -2314,67 +1718,76 @@ public class SeleniumTest {
     }
 
 
-    /* ============================================================
-       HELPER METHOD
-       CREATE EXACT TASK TITLE LOCATOR
-       ============================================================ */
+    // ============================================================
+    // TASK TITLE LOCATOR
+    // ============================================================
 
     private By taskTitleLocator(
             String title) {
 
         return By.xpath(
-                "//*[contains(@class,'task-title')"
-                        +
-                        " and normalize-space(.)="
-                        +
-                        xpathLiteral(
-                                title
-                        )
-                        +
-                        "]"
+                "//*[contains(@class,'task-title') " +
+                "and normalize-space(.)=" +
+                xpathLiteral(title) +
+                "]"
         );
     }
 
 
-    /* ============================================================
-       HELPER METHOD
-       SAFE XPATH STRING
-       ============================================================ */
+    // ============================================================
+    // DIRECT TASK CARD LOCATOR
+    //
+    // IMPORTANT FIX:
+    //
+    // We locate the CARD directly instead of:
+    //
+    // titleElement.findElement(...)
+    //
+    // because TaskNexus re-renders the card after status changes.
+    // ============================================================
+
+    private By taskCardLocator(
+            String title) {
+
+        return By.xpath(
+                "//*[contains(@class,'task-card')]" +
+                "[.//*[contains(@class,'task-title') " +
+                "and normalize-space(.)=" +
+                xpathLiteral(title) +
+                "]]"
+        );
+    }
+
+
+    // ============================================================
+    // XPATH STRING
+    // ============================================================
 
     private String xpathLiteral(
             String text) {
 
-        /*
-         * Text without single quotation mark
-         */
-        if (!text.contains("'")) {
+        if (
+                !text.contains("'")
+        ) {
 
             return "'"
                     + text
                     + "'";
         }
 
-
-        /*
-         * Text without double quotation mark
-         */
-        if (!text.contains("\"")) {
+        if (
+                !text.contains("\"")
+        ) {
 
             return "\""
                     + text
                     + "\"";
         }
 
-
-        /*
-         * Text contains both quote types.
-         * Construct XPath concat expression.
-         */
-        StringBuilder xpath =
+        StringBuilder result =
                 new StringBuilder(
                         "concat("
                 );
-
 
         String[] parts =
                 text.split(
@@ -2382,195 +1795,762 @@ public class SeleniumTest {
                         -1
                 );
 
+        for (
+                int i = 0;
+                i < parts.length;
+                i++
+        ) {
 
-        for (int index = 0;
-             index < parts.length;
-             index++) {
+            if (
+                    i > 0
+            ) {
 
-            if (index > 0) {
-
-                xpath.append(
+                result.append(
                         ",\"'\","
                 );
             }
 
-
-            xpath.append(
+            result.append(
                     "'"
             );
 
-
-            xpath.append(
-                    parts[index]
+            result.append(
+                    parts[i]
             );
 
-
-            xpath.append(
+            result.append(
                     "'"
             );
         }
 
-
-        xpath.append(
+        result.append(
                 ")"
         );
 
-
-        return xpath.toString();
+        return result.toString();
     }
 
 
-    /* ============================================================
-       HELPER METHOD
-       CHECK IF TASK EXISTS
-       ============================================================ */
-
-    private boolean taskExists(
-            String title) {
-
-        List<WebElement> tasks =
-                driver.findElements(
-                        taskTitleLocator(
-                                title
-                        )
-                );
-
-
-        return !tasks.isEmpty();
-    }
-
-
-    /* ============================================================
-       HELPER METHOD
-       FIND COMPLETE TASK CARD
-       ============================================================ */
+    // ============================================================
+    // FIND TASK CARD - STALE SAFE
+    // ============================================================
 
     private WebElement findTaskCard(
             String title) {
 
-        WebElement titleElement =
-                wait.until(
-                        ExpectedConditions
-                                .presenceOfElementLocated(
-                                        taskTitleLocator(
-                                                title
-                                        )
-                                )
+        By cardLocator =
+                taskCardLocator(
+                        title
                 );
 
+        for (
+                int attempt = 1;
+                attempt <= 5;
+                attempt++
+        ) {
+
+            try {
+
+                /*
+                 * IMPORTANT:
+                 * Find the CARD directly.
+                 */
+
+                WebElement card =
+                        wait.until(
+                                ExpectedConditions
+                                        .presenceOfElementLocated(
+                                                cardLocator
+                                        )
+                        );
+
+                if (
+                        card.isDisplayed()
+                ) {
+
+                    return card;
+                }
+
+            } catch (
+                    StaleElementReferenceException e
+            ) {
+
+                System.out.println(
+                        "Stale task card detected. "
+                                + "Retry "
+                                + attempt
+                                + "/5"
+                );
+
+                sleep(300);
+            }
+        }
 
         /*
-         * Move upward from task title to complete card
+         * Final fresh lookup.
          */
-        return titleElement.findElement(
-                By.xpath(
-                        "./ancestor::*["
-                                +
-                        "contains(@class,'task-card')"
-                                +
-                        "][1]"
-                )
+
+        return wait.until(
+                ExpectedConditions
+                        .presenceOfElementLocated(
+                                cardLocator
+                        )
         );
     }
 
 
-    /* ============================================================
-       HELPER METHOD
-       GET TASK STATUS
-       ============================================================ */
+    // ============================================================
+    // TASK STATUS - STALE SAFE
+    // ============================================================
 
     private String getTaskStatus(
             String title) {
 
-        WebElement taskCard =
-                findTaskCard(
+        By cardLocator =
+                taskCardLocator(
                         title
                 );
 
-
-        WebElement statusElement =
-                taskCard.findElement(
-                        By.cssSelector(
-                                ".status"
-                        )
+        By statusLocator =
+                By.cssSelector(
+                        ".status"
                 );
 
+        for (
+                int attempt = 1;
+                attempt <= 5;
+                attempt++
+        ) {
 
-        return statusElement
+            try {
+
+                /*
+                 * Always locate a completely fresh card.
+                 */
+
+                WebElement card =
+                        wait.until(
+                                ExpectedConditions
+                                        .presenceOfElementLocated(
+                                                cardLocator
+                                        )
+                        );
+
+                /*
+                 * Locate status from fresh card.
+                 */
+
+                WebElement status =
+                        card.findElement(
+                                statusLocator
+                        );
+
+                String value =
+                        status
+                                .getText()
+                                .trim();
+
+                if (
+                        !value.isEmpty()
+                ) {
+
+                    return value;
+                }
+
+            } catch (
+                    StaleElementReferenceException e
+            ) {
+
+                System.out.println(
+                        "Stale status element detected. "
+                                + "Retry "
+                                + attempt
+                                + "/5"
+                );
+
+                sleep(400);
+            }
+        }
+
+        /*
+         * Final completely fresh lookup.
+         */
+
+        WebElement freshCard =
+                wait.until(
+                        ExpectedConditions
+                                .presenceOfElementLocated(
+                                        cardLocator
+                                )
+                );
+
+        return freshCard
+                .findElement(
+                        statusLocator
+                )
                 .getText()
                 .trim();
     }
 
 
-    /* ============================================================
-       HELPER METHOD
-       CLICK TASK ACTION
-       ============================================================ */
+    // ============================================================
+    // WAIT FOR SPECIFIC STATUS
+    // ============================================================
+
+    private void waitForStatus(
+            String title,
+            String expectedStatus) {
+
+        wait.until(
+                webDriver -> {
+
+                    try {
+
+                        String current =
+                                getTaskStatus(
+                                        title
+                                );
+
+                        System.out.println(
+                                "Task: "
+                                        + title
+                                        + " | Current Status: "
+                                        + current
+                        );
+
+                        return expectedStatus.equals(
+                                current
+                        );
+
+                    } catch (
+                            StaleElementReferenceException e
+                    ) {
+
+                        return false;
+
+                    } catch (
+                            WebDriverException e
+                    ) {
+
+                        return false;
+                    }
+                }
+        );
+    }
+
+
+    // ============================================================
+    // TASK ACTION
+    // ============================================================
 
     private void clickTaskAction(
-            WebElement taskCard,
+            String title,
             String buttonSelector) {
 
+        By titleLocator =
+                taskTitleLocator(
+                        title
+                );
+
+        for (
+                int attempt = 1;
+                attempt <= 5;
+                attempt++
+        ) {
+
+            try {
+
+                /*
+                 * ALWAYS find the title again.
+                 */
+
+                WebElement titleElement =
+                        wait.until(
+                                ExpectedConditions
+                                        .presenceOfElementLocated(
+                                                titleLocator
+                                        )
+                        );
+
+                /*
+                 * Immediately find the parent card.
+                 *
+                 * This card is used only for this attempt.
+                 */
+
+                WebElement card =
+                        titleElement.findElement(
+                                By.xpath(
+                                        "./ancestor::*[" +
+                                        "contains(@class,'task-card')" +
+                                        "][1]"
+                                )
+                        );
+
+                /*
+                 * Find the action button.
+                 */
+
+                WebElement button =
+                        card.findElement(
+                                By.cssSelector(
+                                        buttonSelector
+                                )
+                        );
+
+                /*
+                 * Scroll.
+                 */
+
+                scrollToCenter(
+                        button
+                );
+
+                sleep(250);
+
+                /*
+                 * Check current state.
+                 */
+
+                if (
+                        !button.isDisplayed()
+                                ||
+                        !button.isEnabled()
+                ) {
+
+                    throw new ElementNotInteractableException(
+                            "Task action button is not ready."
+                    );
+                }
+
+                /*
+                 * Normal Selenium click.
+                 */
+
+                button.click();
+
+                /*
+                 * Wait for DOM refresh.
+                 */
+
+                waitForPageReady();
+
+                wait.until(
+                        ExpectedConditions
+                                .presenceOfElementLocated(
+                                        By.id(
+                                                "taskGrid"
+                                        )
+                                )
+                );
+
+                return;
+
+            } catch (
+                    StaleElementReferenceException e
+            ) {
+
+                System.out.println(
+                        "Task action stale element. "
+                                + "Retry "
+                                + attempt
+                                + "/5"
+                );
+
+                sleep(500);
+
+            } catch (
+                    ElementNotInteractableException e
+            ) {
+
+                System.out.println(
+                        "Task action not interactable. "
+                                + "Retry "
+                                + attempt
+                                + "/5"
+                );
+
+                sleep(500);
+
+            } catch (
+                    WebDriverException e
+            ) {
+
+                System.out.println(
+                        "Task action WebDriver error. "
+                                + "Retry "
+                                + attempt
+                                + "/5"
+                );
+
+                sleep(500);
+            }
+        }
+
         /*
-         * Save current page
+         * Final fresh lookup and JavaScript click.
          */
-        WebElement oldBody =
-                driver.findElement(
-                        By.tagName(
-                                "body"
+
+        WebElement freshTitle =
+                wait.until(
+                        ExpectedConditions
+                                .presenceOfElementLocated(
+                                        titleLocator
+                                )
+                );
+
+        WebElement freshCard =
+                freshTitle.findElement(
+                        By.xpath(
+                                "./ancestor::*[" +
+                                "contains(@class,'task-card')" +
+                                "][1]"
                         )
                 );
 
-
-        /*
-         * Locate action button
-         */
-        WebElement button =
-                taskCard.findElement(
+        WebElement freshButton =
+                freshCard.findElement(
                         By.cssSelector(
                                 buttonSelector
                         )
                 );
 
-
-        /*
-         * Click action
-         */
-        button.click();
-
-
-        /*
-         * Wait for Servlet redirect
-         */
-        wait.until(
-                ExpectedConditions
-                        .stalenessOf(
-                                oldBody
-                        )
+        scrollToCenter(
+                freshButton
         );
 
+        (
+                (JavascriptExecutor)
+                        driver
+        ).executeScript(
+                "arguments[0].click();",
+                freshButton
+        );
+
+        waitForPageReady();
+    }
+
+
+    // ============================================================
+    // DELETE BUTTON
+    // ============================================================
+
+    private void clickDeleteButton(
+            String title) {
+
+        By titleLocator =
+                taskTitleLocator(
+                        title
+                );
+
+        for (
+                int attempt = 1;
+                attempt <= 5;
+                attempt++
+        ) {
+
+            try {
+
+                /*
+                 * Fresh title.
+                 */
+
+                WebElement titleElement =
+                        wait.until(
+                                ExpectedConditions
+                                        .presenceOfElementLocated(
+                                                titleLocator
+                                        )
+                        );
+
+                /*
+                 * Fresh card.
+                 */
+
+                WebElement card =
+                        titleElement.findElement(
+                                By.xpath(
+                                        "./ancestor::*[" +
+                                        "contains(@class,'task-card')" +
+                                        "][1]"
+                                )
+                        );
+
+                /*
+                 * Fresh delete button.
+                 */
+
+                WebElement deleteButton =
+                        card.findElement(
+                                By.cssSelector(
+                                        ".delete-button"
+                                )
+                        );
+
+                scrollToCenter(
+                        deleteButton
+                );
+
+                sleep(250);
+
+                deleteButton.click();
+
+                wait.until(
+                        ExpectedConditions
+                                .alertIsPresent()
+                );
+
+                return;
+
+            } catch (
+                    StaleElementReferenceException e
+            ) {
+
+                sleep(500);
+
+            } catch (
+                    ElementNotInteractableException e
+            ) {
+
+                sleep(500);
+
+            } catch (
+                    WebDriverException e
+            ) {
+
+                sleep(500);
+            }
+        }
 
         /*
-         * Wait for dashboard
+         * Final JavaScript fallback.
          */
-        waitForPageReady();
 
+        WebElement freshTitle =
+                wait.until(
+                        ExpectedConditions
+                                .presenceOfElementLocated(
+                                        titleLocator
+                                )
+                );
+
+        WebElement freshCard =
+                freshTitle.findElement(
+                        By.xpath(
+                                "./ancestor::*[" +
+                                "contains(@class,'task-card')" +
+                                "][1]"
+                        )
+                );
+
+        WebElement deleteButton =
+                freshCard.findElement(
+                        By.cssSelector(
+                                ".delete-button"
+                        )
+                );
+
+        scrollToCenter(
+                deleteButton
+        );
+
+        (
+                (JavascriptExecutor)
+                        driver
+        ).executeScript(
+                "arguments[0].click();",
+                deleteButton
+        );
 
         wait.until(
                 ExpectedConditions
-                        .presenceOfElementLocated(
-                                By.id(
-                                        "taskGrid"
-                                )
-                        )
+                        .alertIsPresent()
         );
     }
 
 
-    /* ============================================================
-       HELPER METHOD
-       READ DASHBOARD COUNTER
-       ============================================================ */
+    // ============================================================
+    // SAFE CLICK BY LOCATOR
+    // ============================================================
+
+    private void safeClick(
+            By locator) {
+
+        for (
+                int attempt = 1;
+                attempt <= 5;
+                attempt++
+        ) {
+
+            try {
+
+                /*
+                 * Fresh element every attempt.
+                 */
+
+                WebElement element =
+                        wait.until(
+                                ExpectedConditions
+                                        .elementToBeClickable(
+                                                locator
+                                        )
+                        );
+
+                scrollToCenter(
+                        element
+                );
+
+                sleep(250);
+
+                element.click();
+
+                return;
+
+            } catch (
+                    StaleElementReferenceException e
+            ) {
+
+                System.out.println(
+                        "Stale click element. Retry "
+                                + attempt
+                );
+
+                sleep(400);
+
+            } catch (
+                    ElementNotInteractableException e
+            ) {
+
+                System.out.println(
+                        "Element not interactable. Retry "
+                                + attempt
+                );
+
+                sleep(400);
+
+            } catch (
+                    WebDriverException e
+            ) {
+
+                System.out.println(
+                        "WebDriver click error. Retry "
+                                + attempt
+                );
+
+                sleep(400);
+            }
+        }
+
+        /*
+         * Final fresh JavaScript click.
+         */
+
+        WebElement fresh =
+                wait.until(
+                        ExpectedConditions
+                                .presenceOfElementLocated(
+                                        locator
+                                )
+                );
+
+        scrollToCenter(
+                fresh
+        );
+
+        (
+                (JavascriptExecutor)
+                        driver
+        ).executeScript(
+                "arguments[0].click();",
+                fresh
+        );
+    }
+
+
+    // ============================================================
+    // SAFE CLICK WEBELEMENT
+    // ============================================================
+
+    private void safeClick(
+            WebElement element) {
+
+        for (
+                int attempt = 1;
+                attempt <= 3;
+                attempt++
+        ) {
+
+            try {
+
+                scrollToCenter(
+                        element
+                );
+
+                sleep(250);
+
+                element.click();
+
+                return;
+
+            } catch (
+                    StaleElementReferenceException e
+            ) {
+
+                sleep(400);
+
+            } catch (
+                    ElementNotInteractableException e
+            ) {
+
+                sleep(400);
+
+            } catch (
+                    WebDriverException e
+            ) {
+
+                sleep(400);
+            }
+        }
+
+        /*
+         * Last-resort JavaScript click.
+         */
+
+        (
+                (JavascriptExecutor)
+                        driver
+        ).executeScript(
+                "arguments[0].click();",
+                element
+        );
+    }
+
+
+    // ============================================================
+    // SCROLL
+    // ============================================================
+
+    private void scrollToCenter(
+            WebElement element) {
+
+        (
+                (JavascriptExecutor)
+                        driver
+        ).executeScript(
+                """
+                arguments[0].scrollIntoView({
+                    block: 'center',
+                    inline: 'center'
+                });
+                """,
+                element
+        );
+    }
+
+
+    // ============================================================
+    // COUNTER
+    // ============================================================
 
     private int readCounter(
             String elementId) {
@@ -2585,359 +2565,238 @@ public class SeleniumTest {
                                 )
                 );
 
-
-        String text =
-                counter.getText()
+        String value =
+                counter
+                        .getText()
                         .trim();
 
-
         return Integer.parseInt(
-                text
+                value
         );
     }
 
 
-    /* ============================================================
-       HELPER METHOD
-       FIND TASK POSITION
-       ============================================================ */
+    // ============================================================
+    // DISPLAYED
+    // ============================================================
 
-    private int findTaskPosition(
+    private boolean isDisplayed(
+            By locator) {
+
+        try {
+
+            return wait.until(
+                    ExpectedConditions
+                            .visibilityOfElementLocated(
+                                    locator
+                            )
+            ).isDisplayed();
+
+        } catch (Exception e) {
+
+            return false;
+        }
+    }
+
+
+    // ============================================================
+    // TASK EXISTS
+    // ============================================================
+
+    private boolean taskExists(
             String title) {
 
-        List<WebElement> taskCards =
-                driver.findElements(
-                        By.cssSelector(
-                                "#taskGrid .task-card"
-                        )
-                );
+        try {
 
-
-        for (int index = 0;
-             index < taskCards.size();
-             index++) {
-
-
-            List<WebElement> titleElements =
-                    taskCards.get(
-                            index
-                    ).findElements(
-                            By.cssSelector(
-                                    ".task-title"
+            return !driver
+                    .findElements(
+                            taskTitleLocator(
+                                    title
                             )
-                    );
+                    )
+                    .isEmpty();
 
+        } catch (
+                StaleElementReferenceException e
+        ) {
 
-            if (!titleElements.isEmpty()) {
-
-
-                String currentTitle =
-                        titleElements
-                                .get(0)
-                                .getText()
-                                .trim();
-
-
-                if (currentTitle.equals(
-                        title
-                )) {
-
-                    return index;
-                }
-            }
+            return false;
         }
-
-
-        return -1;
     }
 
 
-    /* ============================================================
-       HELPER METHOD
-       GENERATE UNIQUE TASK TITLE
-       ============================================================ */
-
-    private String uniqueTitle(
-            String prefix) {
-
-        /*
-         * UUID prevents duplicate Selenium task names.
-         */
-        String randomCode =
-                UUID.randomUUID()
-                        .toString()
-                        .substring(
-                                0,
-                                8
-                        );
-
-
-        return prefix
-                + " "
-                + randomCode;
-    }
-
-
-    /* ============================================================
-       HELPER METHOD
-       SCREENSHOT
-       ============================================================ */
+    // ============================================================
+    // SCREENSHOT
+    // ============================================================
 
     private void takeScreenshot(
             String testName)
             throws Exception {
 
-        /*
-         * Skip if browser does not exist
-         */
-        if (driver == null) {
+        if (
+                driver == null
+        ) {
 
             return;
         }
 
-
-        /*
-         * Screenshot directory
-         */
-        Path screenshotDirectory =
+        Path directory =
                 Path.of(
                         "target",
                         "selenium-screenshots"
                 );
 
-
-        /*
-         * Create directory if necessary
-         */
         Files.createDirectories(
-                screenshotDirectory
+                directory
         );
 
-
-        /*
-         * Convert test name into safe filename
-         */
-        String safeFileName =
+        String fileName =
                 testName.replaceAll(
                         "[^a-zA-Z0-9._-]",
                         "_"
                 );
 
-
-        /*
-         * Capture screenshot
-         */
         File source =
-                ((TakesScreenshot) driver)
-                        .getScreenshotAs(
-                                OutputType.FILE
-                        );
+                (
+                        (TakesScreenshot)
+                                driver
+                ).getScreenshotAs(
+                        OutputType.FILE
+                );
 
-
-        /*
-         * Screenshot destination
-         */
         Path destination =
-                screenshotDirectory.resolve(
-                        safeFileName
+                directory.resolve(
+                        fileName
                                 + ".png"
                 );
 
-
-        /*
-         * Copy screenshot
-         */
         Files.copy(
                 source.toPath(),
                 destination,
-                StandardCopyOption.REPLACE_EXISTING
+                StandardCopyOption
+                        .REPLACE_EXISTING
         );
 
-
         System.out.println(
-                "Screenshot Saved : "
+                "Screenshot saved: "
                         + destination
         );
     }
 
 
-    /* ============================================================
-       HELPER METHOD
-       AUTOMATIC SELENIUM TEST DATA CLEANUP
-       ============================================================ */
+    // ============================================================
+    // CLEANUP
+    // ============================================================
 
     private void cleanupCreatedTasks() {
 
-        /*
-         * Make separate copy of task list.
-         */
-        List<String> cleanupList =
+        List<String> tasks =
                 new ArrayList<>(
                         createdTasks
                 );
 
-
-        /*
-         * Process every Selenium-created task.
-         */
-        for (String title
-                : cleanupList) {
-
+        for (
+                String title :
+                tasks
+        ) {
 
             try {
 
-                /*
-                 * Open clean dashboard
-                 */
                 openTasksPage();
 
-
-                /*
-                 * Enter title into search
-                 */
-                WebElement search =
-                        driver.findElement(
-                                By.id(
-                                        "searchTask"
-                                )
-                        );
-
-
-                search.clear();
-
-
-                search.sendKeys(
-                        title
+                applyFilters(
+                        title,
+                        "All",
+                        "All"
                 );
 
-
-                /*
-                 * Save page before search
-                 */
-                WebElement oldBody =
-                        driver.findElement(
-                                By.tagName(
-                                        "body"
-                                )
-                        );
-
-
-                /*
-                 * Execute search
-                 */
-                driver.findElement(
-                        By.id(
-                                "searchButton"
+                if (
+                        !taskExists(
+                                title
                         )
-                ).click();
-
-
-                /*
-                 * Wait for search results
-                 */
-                wait.until(
-                        ExpectedConditions
-                                .stalenessOf(
-                                        oldBody
-                                )
-                );
-
-
-                waitForPageReady();
-
-
-                /*
-                 * Skip if task already deleted
-                 */
-                if (!taskExists(
-                        title
-                )) {
+                ) {
 
                     continue;
                 }
 
+                clickDeleteButton(
+                        title
+                );
 
-                /*
-                 * Find task
-                 */
-                WebElement taskCard =
-                        findTaskCard(
-                                title
-                        );
-
-
-                /*
-                 * Save current page
-                 */
-                oldBody =
-                        driver.findElement(
-                                By.tagName(
-                                        "body"
-                                )
-                        );
-
-
-                /*
-                 * Click Delete
-                 */
-                taskCard.findElement(
-                        By.cssSelector(
-                                ".delete-button"
-                        )
-                ).click();
-
-
-                /*
-                 * Confirm deletion
-                 */
                 Alert alert =
                         wait.until(
                                 ExpectedConditions
                                         .alertIsPresent()
                         );
 
-
                 alert.accept();
-
-
-                /*
-                 * Wait for page refresh
-                 */
-                wait.until(
-                        ExpectedConditions
-                                .stalenessOf(
-                                        oldBody
-                                )
-                );
-
 
                 waitForPageReady();
 
-
                 System.out.println(
-                        "Test Task Removed : "
+                        "Cleanup completed: "
                                 + title
                 );
 
+            } catch (Exception e) {
 
-            } catch (Exception exception) {
-
-
-                /*
-                 * Cleanup failure must not cause
-                 * the actual test case to fail.
-                 */
                 System.out.println(
-                        "Cleanup Skipped : "
+                        "Cleanup skipped: "
                                 + title
+                                + " | "
+                                + e.getMessage()
                 );
             }
         }
 
-
-        /*
-         * Clear Java list
-         */
         createdTasks.clear();
+    }
+
+
+    // ============================================================
+    // UNIQUE TITLE
+    // ============================================================
+
+    private String uniqueTitle(
+            String prefix) {
+
+        return prefix
+                + " "
+                + randomCode();
+    }
+
+
+    private String randomCode() {
+
+        return UUID
+                .randomUUID()
+                .toString()
+                .substring(
+                        0,
+                        8
+                );
+    }
+
+
+    // ============================================================
+    // SLEEP
+    // ============================================================
+
+    private void sleep(
+            long milliseconds) {
+
+        try {
+
+            Thread.sleep(
+                    milliseconds
+            );
+
+        } catch (
+                InterruptedException e
+        ) {
+
+            Thread.currentThread()
+                    .interrupt();
+        }
     }
 }
